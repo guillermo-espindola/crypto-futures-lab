@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from models.candle import Candle
+from models.position_type import PositionType
 from notification.notifier_interface import INotifier
 
 from state.market_state import MarketState
@@ -51,7 +52,7 @@ class TradingLoop:
         self._execution_engine = execution_engine
         self._notifier = notifier
         self._logger = logger
-        self.config = ConfigManager()
+        self._config_manager = ConfigManager()
 
         # Signal Smoothing (EMA)
         self.last_resistance: Optional[float] = None
@@ -67,12 +68,12 @@ class TradingLoop:
         self.last_trade_timestamp = 0.0
 
     def _update_ema(self, long_score: float, short_score: float):
-        a = self.config.get("scoring", "ema_alpha") or 0.25
+        a = self._config_manager.get("scoring", "ema_alpha") or 0.25
         self.long_score_ema = a * long_score + (1 - a) * self.long_score_ema
         self.short_score_ema = a * short_score + (1 - a) * self.short_score_ema
 
     def _update_confirmations(self):
-        threshold = self.config.get("scoring", "confirmation_threshold") or 2
+        threshold = self._config_manager.get("scoring", "confirmation_threshold") or 2
 
         if self.long_score_ema > 0.5: # Calibrated midpoint
             self.long_confirmations += 1
@@ -86,21 +87,21 @@ class TradingLoop:
 
     def _cooldown_active(self) -> bool:
         now = datetime.now().timestamp()
-        cooldown = self.config.get("behavior", "cooldown_seconds") or 10
+        cooldown = self._config_manager.get("behavior", "cooldown_seconds") or 10
         return (now - self.last_trade_timestamp) < cooldown
 
-    def _generate_signal(self) -> Optional[str]:
+    def _generate_position_type(self) -> PositionType:
         if self._cooldown_active():
-            return None
+            return PositionType.NONE
 
-        threshold = self.config.get("scoring", "confirmation_threshold") or 2
+        threshold = self._config_manager.get("scoring", "confirmation_threshold") or 2
         if self.long_confirmations >= threshold and self.long_score_ema > self.short_score_ema:
-            return "LONG"
+            return PositionType.LONG
 
         if self.short_confirmations >= threshold and self.short_score_ema > self.long_score_ema:
-            return "SHORT"
+            return PositionType.SHORT
 
-        return None
+        return PositionType.NONE
 
     def on_new_candle(self, candle: Candle):
         # Structure key levels update
@@ -135,36 +136,36 @@ class TradingLoop:
                 if current_price > 0:
                     for pos in list(self._portfolio_engine._positions):
                         close_reason = None
-                        if pos.side == "LONG" and current_price <= pos.stop_loss:
+                        if pos.position_type == PositionType.LONG and current_price <= pos.stop_loss:
                             close_reason = "STOP LOSS"
-                        elif pos.side == "SHORT" and current_price >= pos.stop_loss:
+                        elif pos.position_type == PositionType.SHORT and current_price >= pos.stop_loss:
                             close_reason = "STOP LOSS"
-                        elif pos.side == "LONG" and current_price >= pos.take_profit:
+                        elif pos.position_type == PositionType.LONG and current_price >= pos.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif pos.side == "SHORT" and current_price <= pos.take_profit:
+                        elif pos.position_type == PositionType.SHORT and current_price <= pos.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif pos.side == "LONG" and self.short_confirmations >= 3 and self.short_score_ema > 0.7:
+                        elif pos.position_type == PositionType.LONG and self.short_confirmations >= 3 and self.short_score_ema > 0.7:
                             close_reason = "REVERSE SIGNAL"
-                        elif pos.side == "SHORT" and self.long_confirmations >= 3 and self.long_score_ema > 0.7:
+                        elif pos.position_type == PositionType.SHORT and self.long_confirmations >= 3 and self.long_score_ema > 0.7:
                             close_reason = "REVERSE SIGNAL"
 
                         if close_reason:
                             pnl = await self._execution_engine.close_position(pos)
                             if pnl is not None:
-                                msg = f"CLOSED {pos.side} Q={pos.quantity:.4f} P={current_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
+                                msg = f"CLOSED {pos.position_type} Q={pos.quantity:.4f} P={current_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
                                 self._logger.info(msg)
                                 self._notifier.notify(msg)
 
                 # 4. ENTRY SIGNAL
-                signal = self._generate_signal()
+                position_type = self._generate_position_type()
 
-                if signal and not self._portfolio_engine._positions:
+                if (position_type != PositionType.NONE) and not self._portfolio_engine._positions:
                     # Dynamic Stop/Profit
-                    tp_pct = 0.02 # Simplified, should be in config
-                    sl_pct = 0.01
+                    take_profit_percentage = 0.02 # Simplified, should be in config
+                    stop_lose_percentage = 0.01
 
-                    stop_loss = current_price * (1 - sl_pct) if signal == "LONG" else current_price * (1 + sl_pct)
-                    take_profit = current_price * (1 + tp_pct) if signal == "LONG" else current_price * (1 - tp_pct)
+                    stop_loss = current_price * (1 - stop_lose_percentage) if position_type == PositionType.LONG else current_price * (1 + stop_lose_percentage)
+                    take_profit = current_price * (1 + take_profit_percentage) if position_type == PositionType.LONG else current_price * (1 - take_profit_percentage)
 
                     # Dynamic Sizing based on Regime
                     qty = self._risk_engine.calculate_position_size(
@@ -178,9 +179,9 @@ class TradingLoop:
                     if qty > 0:
                         result = await self._execution_engine.execute_market_order(
                             symbol=self._symbol,
-                            side=signal,
+                            position_type=position_type,
                             quantity=qty,
-                            leverage=self.config.get("risk", "max_leverage") or 5,
+                            leverage=self._config_manager.get("risk", "max_leverage") or 5,
                             stop_loss=stop_loss,
                             take_profit=take_profit
                         )
@@ -193,8 +194,8 @@ class TradingLoop:
                             self._regime_engine.apply_execution_feedback(rel_slip)
 
                             msg = (
-                                f"EXECUTED {signal} Q={qty:.4f} P={result.execution_price:.6f} "
-                                f"SL={stop_loss:.6f} ({sl_pct:.1%}) TP={take_profit:.6f} ({tp_pct:.1%}) "
+                                f"EXECUTED {position_type} Q={qty:.4f} P={result.execution_price:.6f} "
+                                f"SL={stop_loss:.6f} ({stop_lose_percentage:.1%}) TP={take_profit:.6f} ({take_profit_percentage:.1%}) "
                                 f"Slippage={result.slippage:.6f}"
                             )
                             self._logger.info(msg)

@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 
+from models.position_type import PositionType
+
 
 @dataclass(slots=True)
 class Signal:
 
     symbol: str
 
-    side: str
+    position_type: PositionType
 
     confidence: float
 
@@ -20,10 +22,10 @@ class Signal:
 
     def validate(self):
 
-        if self.side not in [
-            "LONG",
-            "SHORT",
-            "NONE"
+        if self.position_type not in [
+            PositionType.LONG,
+            PositionType.SHORT,
+            PositionType.NONE
         ]:
             raise ValueError(
                 "Invalid side"

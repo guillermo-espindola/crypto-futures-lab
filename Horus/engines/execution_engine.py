@@ -1,8 +1,9 @@
 import asyncio
 import random
 import time
-from typing import Optional, Dict, List
+from typing import Optional, List
 from models.position import Position
+from models.position_type import PositionType
 from models.trade_execution import TradeExecution
 from state.market_state import MarketState
 from engines.risk_engine import RiskEngine
@@ -23,45 +24,42 @@ class ExecutionEngine:
         self.portfolio = portfolio_engine
         self.risk = risk_engine
         self.config = ConfigManager()
-        self.logger = Logger(ExecutionEngine)
 
-        # Feedback Loop State
-        self.execution_history: List[TradeExecution] = []
-        self.slippage_accumulator = 0.0
-        self.trades_count = 0
+        self._execution_history: List[TradeExecution] = []
+        self._slippage_accumulator = 0.0
+        self._trades_count = 0
 
-    def get_average_slippage(self) -> float:
-        """Returns the average slippage across all trades."""
-        if self.trades_count == 0: return 0.0
-        return self.slippage_accumulator / self.trades_count
+    def _calculate_average_slippage(self) -> float:
+        if self._trades_count == 0: return 0.0
+        return self._slippage_accumulator / self._trades_count
 
-    def get_fill_quality(self) -> float:
+    def _get_fill_quality(self) -> float:
         """
         Calculates fill quality: 1.0 (perfect) -> 0.0 (terrible).
         Based on actual slippage vs expected slippage factor.
         """
         expected = self.config.get("execution", "slippage_factor") or 0.0005
-        if self.trades_count == 0: return 1.0
+        if self._trades_count == 0: return 1.0
 
-        avg_slip = self.get_average_slippage()
+        avg_slip = self._calculate_average_slippage()
         # Lower is better
         return float(np.clip(expected / (avg_slip + 1e-9), 0.0, 1.0))
 
     async def execute_market_order(
         self,
         symbol: str,
-        side: str,
+        position_type: PositionType,
         quantity: float,
         leverage: float = 1.0,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None
-    ) -> Optional[TradeExecution]:
+        ) -> Optional[TradeExecution]:
 
         orderbook = self.market_state.get_orderbook(symbol)
         if orderbook is None: return None
 
         # 1. Price Selection
-        if side == "LONG":
+        if position_type == PositionType.LONG:
             best_ask = orderbook.best_ask()
             if best_ask is None: return None
             base_price = best_ask[0]
@@ -78,7 +76,7 @@ class ExecutionEngine:
         # 3. Slippage Model
         slip_factor = self.config.get("execution", "slippage_factor") or 0.0005
         slippage = base_price * slip_factor * random.uniform(0.5, 2.0)
-        execution_price = (base_price + slippage) if side == "LONG" else (base_price - slippage)
+        execution_price = (base_price + slippage) if position_type == PositionType.LONG else (base_price - slippage)
 
         # 4. Fees
         taker_fee = self.config.get("execution", "taker_fee") or 0.0004
@@ -96,7 +94,7 @@ class ExecutionEngine:
             leverage=leverage
         ):
             return TradeExecution(
-                symbol=symbol, side=side, execution_price=0, quantity=0,
+                symbol=symbol, side=position_type, execution_price=0, quantity=0,
                 slippage=0, fees=0, latency_ms=latency,
                 timestamp=int(time.time() * 1000), success=False
             )
@@ -104,7 +102,7 @@ class ExecutionEngine:
         # 6. Position Creation
         position = Position(
             symbol=symbol,
-            side=side,
+            position_type=position_type,
             entry_price=execution_price,
             quantity=quantity,
             leverage=leverage,
@@ -117,20 +115,20 @@ class ExecutionEngine:
         success = self.portfolio.open_position(position)
         if not success:
             return TradeExecution(
-                symbol=symbol, side=side, execution_price=0, quantity=0,
+                symbol=symbol, side=position_type, execution_price=0, quantity=0,
                 slippage=0, fees=0, latency_ms=latency,
                 timestamp=int(time.time() * 1000), success=False
             )
 
         # Update Feedback Loop
         exec_result = TradeExecution(
-            symbol=symbol, side=side, execution_price=execution_price,
+            symbol=symbol, side=position_type, execution_price=execution_price,
             quantity=quantity, slippage=slippage, fees=fees,
             latency_ms=latency, timestamp=int(time.time() * 1000), success=True
         )
-        self.execution_history.append(exec_result)
-        self.slippage_accumulator += abs(slippage / base_price)
-        self.trades_count += 1
+        self._execution_history.append(exec_result)
+        self._slippage_accumulator += abs(slippage / base_price)
+        self._trades_count += 1
 
         return exec_result
 
@@ -138,7 +136,7 @@ class ExecutionEngine:
         orderbook = self.market_state.get_orderbook(position.symbol)
         if orderbook is None: return None
 
-        if position.side == "LONG":
+        if position.position_type == PositionType.LONG:
             res = orderbook.best_bid()
             price = res[0] if res else None
         else:

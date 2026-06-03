@@ -27,8 +27,8 @@ from utils.logger_file import LoggerFile
 
 async def main():
     # 1. CONFIGURATION
-    configManager = ConfigManager()
-    general_settings = configManager.settings.general
+    config_manager = ConfigManager()
+    general_settings = config_manager.settings.general
 
     symbol = general_settings["symbol"]
     time_frame = general_settings["time_frame"]
