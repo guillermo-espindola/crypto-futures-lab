@@ -1,0 +1,3 @@
+INITIAL_BALANCE = 1000.0
+TAKE_PROFIT_PERCENT = 0.005 # 0.005 = 0.5% take profit
+STOP_LOSS_PERCENT = 0.005 # 0.005 = 0.5% stop loss
