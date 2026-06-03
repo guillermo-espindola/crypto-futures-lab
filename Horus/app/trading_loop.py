@@ -125,8 +125,8 @@ class TradingLoop:
 
                 # B. Scoring Fusion (Fuses tick-flow with cached candle snapshots)
                 long_score, short_score = self._scoring_engine.compute_scores()
-                regime_val = self._regime_engine.regime_score()
-                eff_val = self._regime_engine.market_efficiency()
+                regime_score = self._regime_engine.regime_score()
+                market_efficiency = self._regime_engine.market_efficiency()
 
                 # C. Smoothing & Confirmations
                 self._update_ema(long_score, short_score)
@@ -134,25 +134,25 @@ class TradingLoop:
 
                 # 3. POSITION MANAGEMENT
                 if current_price > 0:
-                    for pos in list(self._portfolio_engine._positions):
+                    for position in list(self._portfolio_engine._positions):
                         close_reason = None
-                        if pos.position_type == PositionType.LONG and current_price <= pos.stop_loss:
+                        if position.position_type == PositionType.LONG and current_price <= position.stop_loss:
                             close_reason = "STOP LOSS"
-                        elif pos.position_type == PositionType.SHORT and current_price >= pos.stop_loss:
+                        elif position.position_type == PositionType.SHORT and current_price >= position.stop_loss:
                             close_reason = "STOP LOSS"
-                        elif pos.position_type == PositionType.LONG and current_price >= pos.take_profit:
+                        elif position.position_type == PositionType.LONG and current_price >= position.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif pos.position_type == PositionType.SHORT and current_price <= pos.take_profit:
+                        elif position.position_type == PositionType.SHORT and current_price <= position.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif pos.position_type == PositionType.LONG and self.short_confirmations >= 3 and self.short_score_ema > 0.7:
+                        elif position.position_type == PositionType.LONG and self.short_confirmations >= 3 and self.short_score_ema > 0.7:
                             close_reason = "REVERSE SIGNAL"
-                        elif pos.position_type == PositionType.SHORT and self.long_confirmations >= 3 and self.long_score_ema > 0.7:
+                        elif position.position_type == PositionType.SHORT and self.long_confirmations >= 3 and self.long_score_ema > 0.7:
                             close_reason = "REVERSE SIGNAL"
 
                         if close_reason:
-                            pnl = await self._execution_engine.close_position(pos)
+                            pnl = await self._execution_engine.close_position(position)
                             if pnl is not None:
-                                msg = f"CLOSED {pos.position_type} Q={pos.quantity:.4f} P={current_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
+                                msg = f"CLOSED {position.position_type} Q={position.quantity:.4f} P={current_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
                                 self._logger.info(msg)
                                 self._notifier.notify(msg)
 
@@ -168,19 +168,19 @@ class TradingLoop:
                     take_profit = current_price * (1 + take_profit_percentage) if position_type == PositionType.LONG else current_price * (1 - take_profit_percentage)
 
                     # Dynamic Sizing based on Regime
-                    qty = self._risk_engine.calculate_position_size(
+                    position_size = self._risk_engine.calculate_position_size(
                         balance=self._portfolio_engine._balance,
                         entry_price=current_price,
                         stop_loss_price=stop_loss,
-                        regime_score=regime_val,
-                        efficiency_score=eff_val
+                        regime_score=regime_score,
+                        efficiency_score=market_efficiency
                     )
 
-                    if qty > 0:
+                    if position_size > 0:
                         result = await self._execution_engine.execute_market_order(
                             symbol=self._symbol,
                             position_type=position_type,
-                            quantity=qty,
+                            quantity=position_size,
                             leverage=self._config_manager.get("risk", "max_leverage") or 5,
                             stop_loss=stop_loss,
                             take_profit=take_profit
@@ -194,7 +194,7 @@ class TradingLoop:
                             self._regime_engine.apply_execution_feedback(rel_slip)
 
                             msg = (
-                                f"EXECUTED {position_type} Q={qty:.4f} P={result.execution_price:.6f} "
+                                f"EXECUTED {position_type} Q={position_size:.4f} P={result.execution_price:.6f} "
                                 f"SL={stop_loss:.6f} ({stop_lose_percentage:.1%}) TP={take_profit:.6f} ({take_profit_percentage:.1%}) "
                                 f"Slippage={result.slippage:.6f}"
                             )
@@ -202,9 +202,9 @@ class TradingLoop:
                             self._notifier.notify(msg)
 
                 # 5. SNAPSHOT LOG
-                snapshot = self._portfolio_engine.snapshot({self._symbol: current_price}, int(datetime.now().timestamp()))
+                snapshot = self._portfolio_engine.get_portfolio_snapshot({self._symbol: current_price}, int(datetime.now().timestamp()))
                 self._logger.info(f"[LEVELS] Resistance={self.last_resistance}, Support={self.last_support}")
-                self._logger.info(f"[MARKET] Price={current_price:.6f}, Regime={regime_val:.2f}, Eff={eff_val:.2f}")
+                self._logger.info(f"[MARKET] Price={current_price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
                 self._logger.info(f"[SCORES] L={long_score:.2f} S={short_score:.2f}, EMA_L={self.long_score_ema:.2f}, EMA_S={self.short_score_ema:.2f}")
                 self._logger.info(f"[PORTFOLIO] Equity={snapshot.equity:.2f}, Balance={snapshot.balance:.2f}")
 

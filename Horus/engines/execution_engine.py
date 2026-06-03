@@ -84,7 +84,7 @@ class ExecutionEngine:
         fees = notional * taker_fee
 
         # 5. Risk Approval
-        equity = self.portfolio.equity({symbol: execution_price})
+        equity = self.portfolio.calculate_equity({symbol: execution_price})
         current_exposure = self.portfolio.exposure()
 
         if not self.risk.check_risk_limits(

@@ -26,7 +26,7 @@ class PortfolioEngine:
         self._balance += pnl
         return pnl
 
-    def equity(self, mark_prices: Dict[str, float]) -> float:
+    def calculate_equity(self, mark_prices: Dict[str, float]) -> float:
         """
         Equity = Liquid Balance + Sum of Unrealized PnL of all open positions.
         """
@@ -41,8 +41,8 @@ class PortfolioEngine:
     def exposure(self) -> float:
         return sum(p.notional() for p in self._positions)
 
-    def snapshot(self, mark_prices: Dict[str, float], timestamp: int) -> PortfolioSnapshot:
-        equity = self.equity(mark_prices)
+    def get_portfolio_snapshot(self, mark_prices: Dict[str, float], timestamp: int) -> PortfolioSnapshot:
+        equity = self.calculate_equity(mark_prices)
         return PortfolioSnapshot(
             timestamp=timestamp,
             balance=self._balance,
