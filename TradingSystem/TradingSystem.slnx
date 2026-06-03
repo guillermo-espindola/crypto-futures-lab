@@ -1,0 +1,30 @@
+<Solution>
+  <Folder Name="/deploy/" />
+  <Folder Name="/deploy/docker/" />
+  <Folder Name="/deploy/docker/kafka/">
+    <File Path="deploy/docker/kafka/docker-compose.yml" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/README.md" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Api/" />
+  <Folder Name="/src/Infrastructure/" />
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/FeatureEngine/" />
+  <Folder Name="/src/Services/MarketDataService/">
+    <Project Path="src/Services/MarketDataService/MarketDataService.Application/MarketDataService.Application.csproj" Id="582d83c7-5166-4b8e-8165-157b983f0354" />
+    <Project Path="src/Services/MarketDataService/MarketDataService.Domain/MarketDataService.Domain.csproj" Id="426cff30-888f-4fd3-b998-781f6dd8c183" />
+    <Project Path="src/Services/MarketDataService/MarketDataService.Infrastructure/MarketDataService.Infrastructure.csproj" Id="7d949495-a4e9-49cc-ac62-96fccb4c26ce" />
+    <Project Path="src/Services/MarketDataService/MarketDataService.Ingestion/MarketDataService.Ingestion.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/Shared.Domain/Shared.Domain.csproj" Id="848e0e50-3ab2-4c6a-8bd1-8eef07fb0ed4" />
+    <Project Path="src/Shared/StreamBus.Gateway/StreamBus.Gateway.csproj" Id="c8d9fd71-99c5-45e0-9c1c-cdabb708fd27" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Services/" />
+  <Folder Name="/tests/Services/MarketDataService/">
+    <Project Path="tests/Services/MarketDataService/MarketDataService.Application.Test/MarketDataService.Application.Test.csproj" Id="275ca8dc-002a-4cd2-a747-5a07c228d0a5" />
+  </Folder>
+</Solution>
