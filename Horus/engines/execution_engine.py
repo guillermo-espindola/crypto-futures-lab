@@ -90,7 +90,7 @@ class ExecutionEngine:
         current_exposure = self.portfolio.exposure()
 
         if not self.risk.check_risk_limits(
-            balance=self.portfolio.balance,
+            balance=self.portfolio._balance,
             equity=equity,
             current_exposure=current_exposure,
             leverage=leverage

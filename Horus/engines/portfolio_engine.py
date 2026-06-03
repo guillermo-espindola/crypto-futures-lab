@@ -1,35 +1,29 @@
-from dataclasses import dataclass, field
 from typing import Dict, Optional
 from models.position import Position
 from models.portfolio_snapshot import PortfolioSnapshot
 
 class PortfolioEngine:
-    def __init__(self, initial_balance: float = 10000.0):
-        self.initial_balance = initial_balance
-        self.balance = initial_balance
-        self.positions: list[Position] = []
-        self.realized_pnl = 0.0
-        self.fees_paid = 0.0
+    def __init__(self, initial_balance: float):
+        self._balance = initial_balance
+        self._positions: list[Position] = []
+        self._realized_pnl = 0.0
 
     def open_position(self, position: Position):
-        self.positions.append(position)
-        # Fees are deducted from balance immediately upon opening
-        self.balance -= position.fees_paid
-        self.fees_paid += position.fees_paid
+        self._positions.append(position)
+        self._balance -= position.fees_paid
         return True
 
     def close_position(self, position: Position, exit_price: float) -> Optional[float]:
-        if position not in self.positions:
+        if position not in self._positions:
             return None
 
-        self.positions.remove(position)
+        self._positions.remove(position)
 
-        # Calculate final PnL for this trade
-        pnl = position.unrealized_pnl(exit_price)
+        pnl = position.calculate_unrealized_pnl(exit_price)
 
         # Update global account state
-        self.realized_pnl += pnl
-        self.balance += pnl
+        self._realized_pnl += pnl
+        self._balance += pnl
         return pnl
 
     def equity(self, mark_prices: Dict[str, float]) -> float:
@@ -37,25 +31,25 @@ class PortfolioEngine:
         Equity = Liquid Balance + Sum of Unrealized PnL of all open positions.
         """
         unrealized = 0.0
-        for position in self.positions:
+        for position in self._positions:
             price = mark_prices.get(position.symbol)
             if price:
-                unrealized += position.unrealized_pnl(price)
+                unrealized += position.calculate_unrealized_pnl(price)
 
-        return self.balance + unrealized
+        return self._balance + unrealized
 
     def exposure(self) -> float:
-        return sum(p.notional() for p in self.positions)
+        return sum(p.notional() for p in self._positions)
 
     def snapshot(self, mark_prices: Dict[str, float], timestamp: int) -> PortfolioSnapshot:
         equity = self.equity(mark_prices)
         return PortfolioSnapshot(
             timestamp=timestamp,
-            balance=self.balance,
+            balance=self._balance,
             equity=equity,
             margin_used=self.exposure(),
-            unrealized_pnl=equity - self.balance,
-            realized_pnl=self.realized_pnl,
+            unrealized_pnl=equity - self._balance,
+            realized_pnl=self._realized_pnl,
             exposure=self.exposure(),
-            open_positions=len(self.positions)
+            open_positions=len(self._positions)
         )

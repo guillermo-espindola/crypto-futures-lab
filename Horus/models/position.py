@@ -23,19 +23,7 @@ class Position:
 
     realized_pnl: float = 0.0
 
-    # =====================================================
-    # UNREALIZED
-    # =====================================================
-
-    def unrealized_pnl(
-        self,
-        current_price: float
-    ) -> float:
-        """
-        Calculates the unrealized PnL based on price movement.
-        PnL = (Current - Entry) * Qty for Long
-        PnL = (Entry - Current) * Qty for Short
-        """
+    def calculate_unrealized_pnl(self, current_price: float) -> float:
         if self.side == "LONG":
             return (current_price - self.entry_price) * self.quantity
 

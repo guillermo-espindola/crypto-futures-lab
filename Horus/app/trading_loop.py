@@ -133,7 +133,7 @@ class TradingLoop:
 
                 # 3. POSITION MANAGEMENT
                 if current_price > 0:
-                    for pos in list(self._portfolio_engine.positions):
+                    for pos in list(self._portfolio_engine._positions):
                         close_reason = None
                         if pos.side == "LONG" and current_price <= pos.stop_loss:
                             close_reason = "STOP LOSS"
@@ -158,7 +158,7 @@ class TradingLoop:
                 # 4. ENTRY SIGNAL
                 signal = self._generate_signal()
 
-                if signal and not self._portfolio_engine.positions:
+                if signal and not self._portfolio_engine._positions:
                     # Dynamic Stop/Profit
                     tp_pct = 0.02 # Simplified, should be in config
                     sl_pct = 0.01
@@ -168,7 +168,7 @@ class TradingLoop:
 
                     # Dynamic Sizing based on Regime
                     qty = self._risk_engine.calculate_position_size(
-                        balance=self._portfolio_engine.balance,
+                        balance=self._portfolio_engine._balance,
                         entry_price=current_price,
                         stop_loss_price=stop_loss,
                         regime_score=regime_val,

@@ -27,14 +27,14 @@ from utils.logger_file import LoggerFile
 
 async def main():
     # 1. CONFIGURATION
-    config = ConfigManager()
-    gen = config.settings.general
+    configManager = ConfigManager()
+    general_settings = configManager.settings.general
 
-    symbol = gen["symbol"]
-    time_frame = gen["time_frame"]
-    time_frames = gen["time_frames"]
-    max_candles = gen["max_candles"]
-    initial_balance = gen["initial_balance"]
+    symbol = general_settings["symbol"]
+    time_frame = general_settings["time_frame"]
+    time_frames = general_settings["time_frames"]
+    max_candles = general_settings["max_candles"]
+    initial_balance = general_settings["initial_balance"]
 
     # 2. STATE
     candles_state = CandlesState(max_candles, Logger(CandlesState))
