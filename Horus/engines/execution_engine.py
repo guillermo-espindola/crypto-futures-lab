@@ -52,7 +52,8 @@ class ExecutionEngine:
         quantity: float,
         leverage: float = 1.0,
         stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None
+        take_profit: Optional[float] = None,
+        market_price: float = 0.0
         ) -> Optional[TradeExecution]:
 
         orderbook = self.market_state.get_orderbook(symbol)
@@ -84,11 +85,11 @@ class ExecutionEngine:
         fees = notional * taker_fee
 
         # 5. Risk Approval
-        equity = self.portfolio.calculate_equity({symbol: execution_price})
-        current_exposure = self.portfolio.exposure()
+        equity = self.portfolio.calculate_equity(execution_price)
+        current_exposure = self.portfolio.calculate_exposure()
 
-        if not self.risk.check_risk_limits(
-            balance=self.portfolio._balance,
+        if self.portfolio.has_open_position() or not self.risk.check_risk_limits(
+            balance=self.portfolio.get_balance(),
             equity=equity,
             current_exposure=current_exposure,
             leverage=leverage
@@ -103,22 +104,17 @@ class ExecutionEngine:
         position = Position(
             symbol=symbol,
             position_type=position_type,
+            market_price=market_price,
             entry_price=execution_price,
             quantity=quantity,
             leverage=leverage,
             timestamp=int(time.time() * 1000),
             stop_loss=stop_loss or 0,
             take_profit=take_profit or 0,
-            fees_paid=fees
+            total_fees_paid=fees
         )
 
-        success = self.portfolio.open_position(position)
-        if not success:
-            return TradeExecution(
-                symbol=symbol, side=position_type, execution_price=0, quantity=0,
-                slippage=0, fees=0, latency_ms=latency,
-                timestamp=int(time.time() * 1000), success=False
-            )
+        self.portfolio.open_position(position)
 
         # Update Feedback Loop
         exec_result = TradeExecution(
@@ -132,16 +128,5 @@ class ExecutionEngine:
 
         return exec_result
 
-    async def close_position(self, position: Position) -> Optional[float]:
-        orderbook = self.market_state.get_orderbook(position.symbol)
-        if orderbook is None: return None
-
-        if position.position_type == PositionType.LONG:
-            res = orderbook.best_bid()
-            price = res[0] if res else None
-        else:
-            res = orderbook.best_ask()
-            price = res[0] if res else None
-
-        if price is None: return None
-        return self.portfolio.close_position(position, price)
+    async def close_position(self, current_price: float) -> Optional[float]:
+        return self.portfolio.close_position(current_price)

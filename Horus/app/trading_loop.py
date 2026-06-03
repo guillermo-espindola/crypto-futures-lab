@@ -116,7 +116,7 @@ class TradingLoop:
             while True:
                 # 1. UPDATE MARKET DATA
                 await self._kafka_consumer.poll_events()
-                current_price = self._market_state.get_last_price(self._symbol, "1m")
+                current_market_price = self._market_state.get_last_price(self._symbol, "1m")
 
                 # 2. HIERARCHICAL PIPELINE
 
@@ -133,44 +133,45 @@ class TradingLoop:
                 self._update_confirmations()
 
                 # 3. POSITION MANAGEMENT
-                if current_price > 0:
-                    for position in list(self._portfolio_engine._positions):
+                if current_market_price > 0:
+                    if self._portfolio_engine.has_open_position():
+                        current_position = self._portfolio_engine.get_current_position()
                         close_reason = None
-                        if position.position_type == PositionType.LONG and current_price <= position.stop_loss:
+                        if current_position.position_type == PositionType.LONG and current_market_price <= current_position.stop_loss:
                             close_reason = "STOP LOSS"
-                        elif position.position_type == PositionType.SHORT and current_price >= position.stop_loss:
+                        elif current_position.position_type == PositionType.SHORT and current_market_price >= current_position.stop_loss:
                             close_reason = "STOP LOSS"
-                        elif position.position_type == PositionType.LONG and current_price >= position.take_profit:
+                        elif current_position.position_type == PositionType.LONG and current_market_price >= current_position.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif position.position_type == PositionType.SHORT and current_price <= position.take_profit:
+                        elif current_position.position_type == PositionType.SHORT and current_market_price <= current_position.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif position.position_type == PositionType.LONG and self.short_confirmations >= 3 and self.short_score_ema > 0.7:
+                        elif current_position.position_type == PositionType.LONG and self.short_confirmations >= 3 and self.short_score_ema > 0.7:
                             close_reason = "REVERSE SIGNAL"
-                        elif position.position_type == PositionType.SHORT and self.long_confirmations >= 3 and self.long_score_ema > 0.7:
+                        elif current_position.position_type == PositionType.SHORT and self.long_confirmations >= 3 and self.long_score_ema > 0.7:
                             close_reason = "REVERSE SIGNAL"
 
                         if close_reason:
-                            pnl = await self._execution_engine.close_position(position)
+                            pnl = await self._execution_engine.close_position(current_market_price)
                             if pnl is not None:
-                                msg = f"CLOSED {position.position_type} Q={position.quantity:.4f} P={current_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
+                                msg = f"CLOSED {current_position.position_type} Q={current_position.quantity:.4f} P={current_market_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
                                 self._logger.info(msg)
                                 self._notifier.notify(msg)
 
                 # 4. ENTRY SIGNAL
                 position_type = self._generate_position_type()
 
-                if (position_type != PositionType.NONE) and not self._portfolio_engine._positions:
+                if (position_type != PositionType.NONE) and not self._portfolio_engine.has_open_position():
                     # Dynamic Stop/Profit
                     take_profit_percentage = 0.02 # Simplified, should be in config
                     stop_lose_percentage = 0.01
 
-                    stop_loss = current_price * (1 - stop_lose_percentage) if position_type == PositionType.LONG else current_price * (1 + stop_lose_percentage)
-                    take_profit = current_price * (1 + take_profit_percentage) if position_type == PositionType.LONG else current_price * (1 - take_profit_percentage)
+                    stop_loss = current_market_price * (1 - stop_lose_percentage) if position_type == PositionType.LONG else current_market_price * (1 + stop_lose_percentage)
+                    take_profit = current_market_price * (1 + take_profit_percentage) if position_type == PositionType.LONG else current_market_price * (1 - take_profit_percentage)
 
                     # Dynamic Sizing based on Regime
                     position_size = self._risk_engine.calculate_position_size(
                         balance=self._portfolio_engine._balance,
-                        entry_price=current_price,
+                        entry_price=current_market_price,
                         stop_loss_price=stop_loss,
                         regime_score=regime_score,
                         efficiency_score=market_efficiency
@@ -183,7 +184,8 @@ class TradingLoop:
                             quantity=position_size,
                             leverage=self._config_manager.get("risk", "max_leverage") or 5,
                             stop_loss=stop_loss,
-                            take_profit=take_profit
+                            take_profit=take_profit,
+                            market_price=current_market_price
                         )
 
                         if result and result.success:
@@ -194,7 +196,7 @@ class TradingLoop:
                             self._regime_engine.apply_execution_feedback(rel_slip)
 
                             msg = (
-                                f"EXECUTED {position_type} Q={position_size:.4f} P={result.execution_price:.6f} "
+                                f"EXECUTED {position_type} Q={position_size:.4f} P={result.execution_price:.6f} MP={current_market_price:.6f} "
                                 f"SL={stop_loss:.6f} ({stop_lose_percentage:.1%}) TP={take_profit:.6f} ({take_profit_percentage:.1%}) "
                                 f"Slippage={result.slippage:.6f}"
                             )
@@ -202,11 +204,11 @@ class TradingLoop:
                             self._notifier.notify(msg)
 
                 # 5. SNAPSHOT LOG
-                snapshot = self._portfolio_engine.get_portfolio_snapshot({self._symbol: current_price}, int(datetime.now().timestamp()))
+                portfolio_snapshot = self._portfolio_engine.get_portfolio_snapshot(current_market_price)
                 self._logger.info(f"[LEVELS] Resistance={self.last_resistance}, Support={self.last_support}")
-                self._logger.info(f"[MARKET] Price={current_price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
+                self._logger.info(f"[MARKET] Price={current_market_price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
                 self._logger.info(f"[SCORES] L={long_score:.2f} S={short_score:.2f}, EMA_L={self.long_score_ema:.2f}, EMA_S={self.short_score_ema:.2f}")
-                self._logger.info(f"[PORTFOLIO] Equity={snapshot.equity:.2f}, Balance={snapshot.balance:.2f}")
+                self._logger.info(f"[PORTFOLIO] Equity={portfolio_snapshot.equity:.2f}, Balance={portfolio_snapshot.balance:.2f}")
 
                 await asyncio.sleep(sleep_time)
 
