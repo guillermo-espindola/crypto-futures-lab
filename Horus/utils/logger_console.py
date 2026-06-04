@@ -1,18 +1,14 @@
 import logging
-import os
 
-from logging.handlers import RotatingFileHandler
 from typing import Any
 from utils.logger_interface import ILogger
 
-class LoggerFile(ILogger):
+class LoggerConsole(ILogger):
     def __init__(self, type: Any):
         self._name = type.__name__ if hasattr(type, '__name__') else str(type)
         self._logger = logging.getLogger(self._name)
         self._logger.setLevel(logging.INFO)
-
         if not self._logger.handlers:
-            os.makedirs("./logs", exist_ok=True)
 
             formatter = logging.Formatter(
                 "[%(asctime)s]"
@@ -21,19 +17,14 @@ class LoggerFile(ILogger):
                 "%(message)s"
             )
 
-            file_handler = RotatingFileHandler(
-                filename=f"./logs/{self._name}.log",
-                mode="a",
-                maxBytes=64 * 1024,  # 64 KB
-                backupCount=2,      # .log + .log.1 + .log.2 = 3 files
-                encoding="utf-8"
-            )
+            handler = logging.StreamHandler()
 
-            file_handler.setFormatter(formatter)
-            self._logger.addHandler(file_handler)
+            handler.setFormatter(formatter)
+
+            self._logger.addHandler(handler)
 
     def info(self, message: str):
         self._logger.info(message)
-
+    
     def error(self, message: str):
         self._logger.error(message)

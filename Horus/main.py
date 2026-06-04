@@ -1,9 +1,6 @@
 import asyncio
-from app.trading_loop import TradingLoop
 
-from notification.toast_notifier import ToastNotifier
-from utils.config_manager import ConfigManager
-from utils.logger import Logger
+from app.trading_loop import TradingLoop
 
 from engines.execution_engine import ExecutionEngine
 from engines.liquidity_engine import LiquidityEngine
@@ -16,14 +13,18 @@ from engines.scoring_engine import ScoringEngine
 from engines.structure_engine import StructureEngine
 
 from infrastructure.candles_data_loader import CandlesDataLoader
-from infrastructure.orderbook_data_loader import OrderBookDataLoader
 from infrastructure.event_dispatcher import EventDispatcher
 from infrastructure.kafka_consumer import KafkaConsumer
+from infrastructure.orderbook_data_loader import OrderBookDataLoader
+
+from notification.toast_notifier import ToastNotifier
 
 from state.candles_state import CandlesState
-from state.orderbook_state import OrderBookState
 from state.market_state import MarketState
-from utils.logger_file import LoggerFile
+from state.orderbook_state import OrderBookState
+
+from utils.config_manager import ConfigManager
+from utils.logger import Logger
 
 async def main():
     # 1. CONFIGURATION
@@ -87,7 +88,7 @@ async def main():
     )
 
     # 5. NOTIFIER
-    notifier = ToastNotifier(LoggerFile(ToastNotifier))
+    notifier = ToastNotifier(Logger(ToastNotifier))
 
     # 6. TRADING LOOP
     trading_loop = TradingLoop(
@@ -104,7 +105,7 @@ async def main():
         risk_engine,
         execution_engine,
         notifier,
-        LoggerFile(TradingLoop)
+        Logger(TradingLoop)
     )
 
     try:
