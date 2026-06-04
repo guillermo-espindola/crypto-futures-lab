@@ -104,7 +104,7 @@ async def main():
         risk_engine,
         execution_engine,
         notifier,
-        Logger(TradingLoop)
+        LoggerFile(TradingLoop)
     )
 
     try:
