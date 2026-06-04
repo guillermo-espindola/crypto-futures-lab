@@ -5,11 +5,7 @@ from models.position_type import PositionType
 @dataclass(slots=True)
 class Position:
 
-    symbol: str
-
     position_type: PositionType
-
-    market_price: float
 
     entry_price: float
 

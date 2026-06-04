@@ -77,7 +77,7 @@ async def main():
         Logger(ScoringEngine)
     )
 
-    portfolio_engine = PortfolioEngine(initial_balance)
+    portfolio_engine = PortfolioEngine(initial_balance, Logger(PortfolioEngine))
     risk_engine = RiskEngine()
 
     execution_engine = ExecutionEngine(
@@ -108,10 +108,11 @@ async def main():
     )
 
     try:
-        notifier.notify("Starting trading loop...")
+        notifier.notify("*** HORUS ***")
         candles_data_loader.load()
         orderbook_data_loader.load()
-        candles_state.candle_event.subscribe(trading_loop.on_new_candle)
+        candles_state.new_candle_event.subscribe(trading_loop.on_new_candle)
+        portfolio_engine.open_position_event.subscribe(trading_loop.on_open_position)
 
         await kafka_consumer.start()
         await trading_loop.run(sleep_time=0.5)

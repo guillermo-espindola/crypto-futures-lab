@@ -4,8 +4,6 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class TradeExecution:
 
-    symbol: str
-
     side: str
 
     execution_price: float

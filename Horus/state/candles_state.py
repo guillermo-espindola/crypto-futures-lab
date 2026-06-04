@@ -1,5 +1,5 @@
 from collections import deque
-from infrastructure.candle_event import CandleEvent
+from models.candle_event import CandleEvent
 from models.candle import Candle
 from typing import Dict, List, Optional
 from utils.logger_interface import ILogger
@@ -11,7 +11,8 @@ class CandlesState:
         self._max_length = max_length
         self._candles_data: Dict[str, Dict[str, deque]] = {}
         self._logger = logger
-        self.candle_event = CandleEvent()
+        
+        self.new_candle_event = CandleEvent()
 
     def add(self, candle: Candle):
 
@@ -30,7 +31,7 @@ class CandlesState:
         else:
             current_candles.append(candle)
             self._logger.info(f"Added new candle: {candle.symbol} {candle.timeframe} {candle.open_time}")
-            self.candle_event.trigger(candle)
+            self.new_candle_event.trigger(candle)
 
     def get(self, symbol: str, timeframe:str) -> List[Candle]:
 

@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from models.candle import Candle
+from models.position import Position
 from models.position_type import PositionType
 from notification.notifier_interface import INotifier
 
@@ -102,9 +103,13 @@ class TradingLoop:
             return PositionType.SHORT
 
         return PositionType.NONE
+    
+    def on_open_position(self, position: Position):
+        self.last_trade_timestamp = datetime.now().timestamp()
+        self._notifier.notify(f"[OPEN {position.position_type.value}] Q={position.quantity:.4f} P={position.entry_price:.6f} " 
+                          f"TP={position.take_profit:.6f} SL={position.stop_loss:.6f}")
 
     def on_new_candle(self, candle: Candle):
-        # Structure key levels update
         resistance, support = self._structure_engine.get_key_levels()
         self._logger.info(f"CANDLE UPDATE: Resistance={resistance}, Support={support}")
         self.last_resistance = resistance if resistance is not None else self.last_resistance
@@ -145,9 +150,9 @@ class TradingLoop:
                             close_reason = "TAKE PROFIT"
                         elif current_position.position_type == PositionType.SHORT and current_market_price <= current_position.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif current_position.position_type == PositionType.LONG and self.short_confirmations >= 3 and self.short_score_ema > 0.7:
+                        elif current_position.position_type == PositionType.LONG and self.short_confirmations >= 1 and self.short_score_ema > 0.5: # 3 0.7
                             close_reason = "REVERSE SIGNAL"
-                        elif current_position.position_type == PositionType.SHORT and self.long_confirmations >= 3 and self.long_score_ema > 0.7:
+                        elif current_position.position_type == PositionType.SHORT and self.long_confirmations >= 1 and self.long_score_ema > 0.5: # 3 0.7
                             close_reason = "REVERSE SIGNAL"
 
                         if close_reason:
@@ -179,13 +184,12 @@ class TradingLoop:
 
                     if position_size > 0:
                         result = await self._execution_engine.execute_market_order(
-                            symbol=self._symbol,
                             position_type=position_type,
+                            market_price=current_market_price,
                             quantity=position_size,
                             leverage=self._config_manager.get("risk", "max_leverage") or 5,
                             stop_loss=stop_loss,
-                            take_profit=take_profit,
-                            market_price=current_market_price
+                            take_profit=take_profit
                         )
 
                         if result and result.success:
@@ -195,19 +199,11 @@ class TradingLoop:
                             rel_slip = abs(result.slippage / result.execution_price) if result.execution_price > 0 else 0
                             self._regime_engine.apply_execution_feedback(rel_slip)
 
-                            msg = (
-                                f"EXECUTED {position_type} Q={position_size:.4f} P={result.execution_price:.6f} MP={current_market_price:.6f} "
-                                f"SL={stop_loss:.6f} ({stop_lose_percentage:.1%}) TP={take_profit:.6f} ({take_profit_percentage:.1%}) "
-                                f"Slippage={result.slippage:.6f}"
-                            )
-                            self._logger.info(msg)
-                            self._notifier.notify(msg)
-
                 # 5. SNAPSHOT LOG
                 portfolio_snapshot = self._portfolio_engine.get_portfolio_snapshot(current_market_price)
-                self._logger.info(f"[LEVELS] Resistance={self.last_resistance}, Support={self.last_support}")
                 self._logger.info(f"[MARKET] Price={current_market_price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
-                self._logger.info(f"[SCORES] L={long_score:.2f} S={short_score:.2f}, EMA_L={self.long_score_ema:.2f}, EMA_S={self.short_score_ema:.2f}")
+                self._logger.info(f"[LEVELS] Resistance={self.last_resistance}, Support={self.last_support}")
+                self._logger.info(f"[SCORES] Long={long_score:.2f} Short={short_score:.2f}, EMA_L={self.long_score_ema:.2f}, EMA_S={self.short_score_ema:.2f}")
                 self._logger.info(f"[PORTFOLIO] Equity={portfolio_snapshot.equity:.2f}, Balance={portfolio_snapshot.balance:.2f}")
 
                 await asyncio.sleep(sleep_time)
