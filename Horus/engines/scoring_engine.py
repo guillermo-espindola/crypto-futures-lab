@@ -24,6 +24,7 @@ class ScoringEngine:
                  order_flow_engine: OrderFlowEngine,
                  regime_engine: RegimeEngine,
                  order_book_engine: OrderBookEngine,
+                 config_manager: ConfigManager,
                  logger: Logger):
         self.structure = structure_engine
         self.liquidity = liquidity_engine
@@ -31,7 +32,7 @@ class ScoringEngine:
         self.regime = regime_engine
         self.order_book = order_book_engine
         self.logger = logger
-        self.config = ConfigManager()
+        self.config = config_manager
 
     def _sigmoid(self, x: float) -> float:
         # Numerical stability for sigmoid

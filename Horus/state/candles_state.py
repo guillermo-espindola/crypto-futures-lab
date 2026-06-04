@@ -30,7 +30,7 @@ class CandlesState:
 
         else:
             current_candles.append(candle)
-            self._logger.info(f"Added new candle: {candle.symbol} {candle.timeframe} {candle.open_time}")
+            self._logger.info(f"[ADDED] {candle}")
             self.new_candle_event.trigger(candle)
 
     def get(self, symbol: str, timeframe:str) -> List[Candle]:

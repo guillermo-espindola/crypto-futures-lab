@@ -20,7 +20,7 @@ class KafkaConsumer:
     async def start(self):
 
         for topic in self.topics:
-            self.logger.info(f"Initializing consumer for topic: {topic}")
+            self.logger.info(f"[STARTING CONSUMER] server={self.bootstrap_server} group_id={self.group_id} topic={topic}")
             consumer = AIOKafkaConsumer(
                 topic,
                 bootstrap_servers=self.bootstrap_server,
@@ -37,15 +37,16 @@ class KafkaConsumer:
         self.consumers.clear()
 
     async def poll_events(self):
-        """
-        Polls one batch of messages from all consumers.
-        """
+
         if not self.consumers:
+            self.logger.error("[POLLING] No consumers available to poll.")
             return
 
         for topic, consumer in self.consumers.items():
-            # Poll for a small batch to avoid blocking the loop too long
-            batch = await consumer.getmany(timeout_ms=10, max_records=100)
+            timeout_ms = 100
+            max_records = 200
+            batch = await consumer.getmany(timeout_ms=timeout_ms, max_records=max_records)
+            self.logger.info(f"[POLLING] topic={topic} timeout_ms={timeout_ms} max_records={max_records}")
 
             for tp, messages in batch.items():
                 for msg in messages:

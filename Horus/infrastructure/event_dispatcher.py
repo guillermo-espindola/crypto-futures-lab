@@ -31,7 +31,7 @@ class EventDispatcher:
                 self.market_state.add_liquidation(Liquidation.from_json(event))
 
             else:
-                self.logger.warning(f"Unknown event type: {event_type}")
+                self.logger.error(f"[DISPATCH] Unknown event type: {event_type}")
 
         except Exception as e:
-            self.logger.error(f"Failed to dispatch event: {e}")
+            self.logger.error(f"[DISPATCH] {e}")

@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from typing import Any, Dict
-from utils.logger import Logger
+from utils.logger_interface import ILogger
 
 @dataclass
 class SystemConfig:
@@ -15,9 +15,6 @@ class SystemConfig:
     general: Dict[str, Any]
 
 class ConfigManager:
-    """
-    Handles loading and providing system settings based on the operational mode.
-    """
     _instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -25,12 +22,12 @@ class ConfigManager:
             cls._instance = super(ConfigManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self,config_path: str , logger: ILogger):
         if hasattr(self, "_initialized"):
             return
 
         self.config_path = config_path
-        self.logger = Logger(ConfigManager)
+        self._logger = logger
         self.settings: SystemConfig = self._load_config()
         self._initialized = True
 
@@ -54,7 +51,7 @@ class ConfigManager:
                 general=general
             )
         except Exception as e:
-            self.logger.error(f"Failed to load config from {self.config_path}: {e}. Using defaults.")
+            self._logger.error(f"Failed to load config from {self.config_path}: {e}. Using defaults.")
             # Fallback to basic defaults if file is missing or corrupt
             return self._get_defaults()
 

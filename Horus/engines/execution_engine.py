@@ -1,5 +1,3 @@
-import asyncio
-import random
 import time
 from typing import Optional, List
 from models.position import Position
@@ -13,11 +11,11 @@ from utils.config_manager import ConfigManager
 
 class ExecutionEngine:
     
-    def __init__(self, market_state: MarketState, portfolio_engine: PortfolioEngine, risk_engine: RiskEngine):
+    def __init__(self, market_state: MarketState, portfolio_engine: PortfolioEngine, risk_engine: RiskEngine, config_manager: ConfigManager):
         self.market_state = market_state
         self.portfolio = portfolio_engine
         self.risk = risk_engine
-        self.config_manager = ConfigManager()
+        self.config_manager = config_manager
 
         self._execution_history: List[TradeExecution] = []
         self._trades_count = 0

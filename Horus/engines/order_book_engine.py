@@ -1,8 +1,7 @@
 import numpy as np
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Dict, List
 from state.market_state import MarketState
 from utils.config_manager import ConfigManager
-from utils.logger import Logger
 
 class OrderBookEngine:
     """
@@ -12,11 +11,10 @@ class OrderBookEngine:
     Integrates depth analysis to identify imbalance, pressure, and liquidity walls.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str):
+    def __init__(self, market_state: MarketState, symbol: str, config_manager: ConfigManager):
         self.market_state = market_state
         self.symbol = symbol
-        self.config = ConfigManager()
-        self.logger = Logger(OrderBookEngine)
+        self.config = config_manager
 
     # =====================================================
     # CORE METRICS

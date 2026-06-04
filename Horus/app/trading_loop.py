@@ -37,6 +37,7 @@ class TradingLoop:
                  risk_engine: RiskEngine,
                  execution_engine: ExecutionEngine,
                  notifier: INotifier,
+                 config_manager: ConfigManager,
                  logger: ILogger):
 
         self._symbol = symbol
@@ -53,7 +54,7 @@ class TradingLoop:
         self._execution_engine = execution_engine
         self._notifier = notifier
         self._logger = logger
-        self._config_manager = ConfigManager()
+        self._config_manager = config_manager
 
         # Signal Smoothing (EMA)
         self.last_resistance: Optional[float] = None

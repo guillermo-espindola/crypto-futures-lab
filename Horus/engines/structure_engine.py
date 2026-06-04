@@ -6,7 +6,7 @@ from models.candle_snapshot import CandleSnapshot
 
 from state.market_state import MarketState
 from utils.config_manager import ConfigManager
-from utils.logger import Logger
+from utils.logger_interface import ILogger
 
 class StructureEngine:
     """
@@ -16,12 +16,12 @@ class StructureEngine:
     Optimized for cached data and volatility normalization.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, timeframe: str = "1m"):
+    def __init__(self, market_state: MarketState, symbol: str, timeframe: str, config_manager: ConfigManager, logger: ILogger):
         self.market_state = market_state
         self.symbol = symbol
         self.timeframe = timeframe
-        self.config = ConfigManager()
-        self.logger = Logger(StructureEngine)
+        self.config = config_manager
+        self.logger = logger
 
         self._cache = {}
         self._last_candle_time = None

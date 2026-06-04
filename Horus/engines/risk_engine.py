@@ -1,6 +1,5 @@
-from typing import Dict, Optional
 from utils.config_manager import ConfigManager
-from utils.logger import Logger
+from utils.logger_interface import ILogger
 
 class RiskEngine:
     """
@@ -9,9 +8,9 @@ class RiskEngine:
     Adapts position sizing and risk limits based on market regime and efficiency.
     """
 
-    def __init__(self):
-        self.config = ConfigManager()
-        self.logger = Logger(RiskEngine)
+    def __init__(self, config_manager: ConfigManager, logger: ILogger):
+        self.config = config_manager
+        self.logger = logger
         self.peak_equity = 0.0
 
     def calculate_position_size(

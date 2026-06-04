@@ -1,11 +1,7 @@
-import pandas as pd
 import numpy as np
-from typing import Optional
-from models.candle_snapshot import CandleSnapshot
 
 from state.market_state import MarketState
 from utils.config_manager import ConfigManager
-from utils.logger import Logger
 
 class LiquidityEngine:
     """
@@ -15,12 +11,11 @@ class LiquidityEngine:
     Now normalized by ATR for consistent signal strength across assets/volatility.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, timeframe: str = "1m"):
+    def __init__(self, market_state: MarketState, symbol: str, timeframe: str, config_manager: ConfigManager):
         self.market_state = market_state
         self.symbol = symbol
         self.timeframe = timeframe
-        self.config = ConfigManager()
-        self.logger = Logger(LiquidityEngine)
+        self.config = config_manager
 
     # =====================================================
     # PUBLIC API

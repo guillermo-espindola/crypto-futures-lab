@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple, Optional
 from models.orderbook import OrderBook
 from models.orderbook_snapshot import OrderBookSnapshot
 from utils.logger import Logger
+from utils.logger_interface import ILogger
 
 class OrderBookState:
     """
@@ -11,13 +12,13 @@ class OrderBookState:
     2. Apply Incremental Updates (OrderBook)
     """
 
-    def __init__(self):
+    def __init__(self, logger: ILogger):
         # symbol -> {"bids": {price: qty}, "asks": {price: qty}}
         self._books: Dict[str, Dict[str, Dict[float, float]]] = {}
         self._last_update_id: Dict[str, int] = {}
         self._event_times: Dict[str, int] = {}
         self._transaction_times: Dict[str, int] = {}
-        self.logger = Logger(OrderBookState)
+        self._logger = logger
 
     def apply_snapshot(self, symbol: str, snapshot: OrderBookSnapshot):
         """
@@ -33,7 +34,7 @@ class OrderBookState:
         self._last_update_id[symbol] = snapshot.final_update_id
         self._event_times[symbol] = snapshot.event_time
         self._transaction_times[symbol] = snapshot.transaction_time
-        self.logger.info(f"OrderBook snapshot applied for {symbol}. ID: {snapshot.final_update_id}")
+        self._logger.info(f"OrderBook snapshot applied for {symbol}. ID: {snapshot.final_update_id}")
 
     def update(self, update: OrderBook):
         """
@@ -41,12 +42,12 @@ class OrderBookState:
         """
         symbol = update.symbol
         if symbol not in self._books:
-            self.logger.warn(f"Received update for {symbol} but no snapshot is loaded. Skipping.")
+            self._logger.warn(f"Received update for {symbol} but no snapshot is loaded. Skipping.")
             return
 
         # Sequence validation (Binance: u must be >= lastUpdateId of snapshot)
         if update.previous_update_id < self._last_update_id.get(symbol, 0):
-            self.logger.error(f"OrderBook update sequence gap for {symbol}. Recovery required.")
+            self._logger.error(f"OrderBook update sequence gap for {symbol}. Recovery required.")
             return
 
         book = self._books[symbol]

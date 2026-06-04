@@ -5,7 +5,7 @@ from models.candle_snapshot import CandleSnapshot
 
 from state.market_state import MarketState
 from utils.config_manager import ConfigManager
-from utils.logger import Logger
+from utils.logger_interface import ILogger
 
 class RegimeEngine:
     """
@@ -15,12 +15,12 @@ class RegimeEngine:
     Optimized to use CandleSnapshots and dynamic execution feedback.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, timeframe: str = "1m"):
+    def __init__(self, market_state: MarketState, symbol: str, timeframe: str, config_manager: ConfigManager, logger: ILogger):
         self.market_state = market_state
         self.symbol = symbol
         self.timeframe = timeframe
-        self.config = ConfigManager()
-        self.logger = Logger(RegimeEngine)
+        self.config = config_manager
+        self.logger = logger
 
         # Cache for the current candle's results
         self._current_results = {}

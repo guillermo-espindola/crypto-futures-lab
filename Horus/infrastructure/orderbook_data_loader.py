@@ -1,18 +1,13 @@
 import requests
-from typing import Optional
+
 from infrastructure.loader_interface import ILoader
 from models.orderbook_snapshot import OrderBookSnapshot
 from state.orderbook_state import OrderBookState
-from utils.logger import Logger
+from utils.logger_interface import ILogger
 
 class OrderBookDataLoader(ILoader):
-    """
-    OrderBook DataLoader
-    ------------------
-    Fetches the initial local order book snapshot from Binance REST API.
-    """
 
-    def __init__(self, symbol: str, limit: int, orderbook_state: OrderBookState, logger: Logger):
+    def __init__(self, symbol: str, limit: int, orderbook_state: OrderBookState, logger: ILogger):
         self._symbol = symbol
         self._limit = limit
         self._orderbook_state = orderbook_state
@@ -20,25 +15,19 @@ class OrderBookDataLoader(ILoader):
         self._url = "https://fapi.binance.com/fapi/v1/depth"
 
     def load(self):
-        """
-        Fetches the snapshot and applies it to the state.
-        """
-        params = {
-            "symbol": self._symbol,
-            "limit": self._limit
-        }
+
+        params = { "symbol": self._symbol,
+                    "limit": self._limit }
 
         try:
-            self._logger.info(f"Fetching OrderBook snapshot for {self._symbol} (limit={self._limit})")
+            self._logger.info(f"[FETCHING ORDERBOOK] url={self._url} params={params}")
             response = requests.get(self._url, params=params)
             response.raise_for_status()
             data = response.json()
 
-            # Correctly use OrderBookSnapshot for the REST API response
-            snapshot = OrderBookSnapshot.from_json(data)
-            self._orderbook_state.apply_snapshot(self._symbol, snapshot)
+            order_book_snapshot = OrderBookSnapshot.from_json(data)
+            self._orderbook_state.apply_snapshot(self._symbol, order_book_snapshot)
 
-            self._logger.info(f"OrderBook snapshot successfully loaded for {self._symbol}")
         except Exception as e:
-            self._logger.error(f"Error loading OrderBook snapshot: {e}")
+            self._logger.error(f"[FETCHING ORDERBOOK] {e}")
             raise e

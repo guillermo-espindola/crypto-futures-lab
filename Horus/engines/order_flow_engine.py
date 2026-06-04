@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from state.market_state import MarketState
 from utils.config_manager import ConfigManager
-from utils.logger import Logger
+from utils.logger_interface import ILogger
 from models.trade import Trade
 from models.orderbook import OrderBook
 
@@ -26,11 +26,11 @@ class OrderFlowEngine:
     Integrates Order Book depth to calculate real liquidity pressure.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, logger: Optional[Logger] = None):
+    def __init__(self, market_state: MarketState, symbol: str, config_manager: ConfigManager, logger: ILogger):
         self.market_state = market_state
         self.symbol = symbol
-        self.config = ConfigManager()
-        self.logger = logger or Logger(OrderFlowEngine)
+        self.config = config_manager
+        self.logger = logger
 
         # Rolling history of impact values
         self.impact_history = deque(maxlen=2000)

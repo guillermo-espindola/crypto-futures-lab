@@ -25,11 +25,15 @@ from state.orderbook_state import OrderBookState
 
 from utils.config_manager import ConfigManager
 from utils.logger import Logger
+from utils.logger_settings import LoggerSettings
 
 async def main():
     # 1. CONFIGURATION
-    config_manager = ConfigManager()
+    path_config_file = "config.json"
+    logger_settings = LoggerSettings(enable_file_logging=True, enable_console_logging=True)
+    config_manager = ConfigManager(path_config_file, Logger(ConfigManager, logger_settings))
     general_settings = config_manager.settings.general
+
 
     symbol = general_settings["symbol"]
     time_frame = general_settings["time_frame"]
@@ -38,14 +42,14 @@ async def main():
     initial_balance = general_settings["initial_balance"]
 
     # 2. STATE
-    candles_state = CandlesState(max_candles, Logger(CandlesState))
-    order_book_state = OrderBookState()
+    candles_state = CandlesState(max_candles, Logger(CandlesState, logger_settings))
+    order_book_state = OrderBookState(Logger(OrderBookState, logger_settings))
     market_state = MarketState(symbol, candles_state, order_book_state)
 
     # 3. LOADER & CONSUMER
-    candles_data_loader = CandlesDataLoader(symbol, time_frames, max_candles, candles_state, Logger(CandlesDataLoader))
-    orderbook_data_loader = OrderBookDataLoader(symbol, 100, order_book_state, Logger(OrderBookDataLoader))
-    event_dispatcher = EventDispatcher(market_state, Logger(EventDispatcher))
+    candles_data_loader = CandlesDataLoader(symbol, time_frames, max_candles, candles_state, Logger(CandlesDataLoader, logger_settings))
+    orderbook_data_loader = OrderBookDataLoader(symbol, 100, order_book_state, Logger(OrderBookDataLoader, logger_settings))
+    event_dispatcher = EventDispatcher(market_state, Logger(EventDispatcher, logger_settings))
     kafka_consumer = KafkaConsumer(
         [
         "Candles",
@@ -57,17 +61,17 @@ async def main():
         "localhost:29092",
         "hft-trading-loop",
         event_dispatcher,
-        Logger(KafkaConsumer)
+        Logger(KafkaConsumer, logger_settings)
     )
     # Note: In a real scenario, we'd use the exact values from config.json general/kafka section
     # For now, we use defaults or the JSON config mapping.
 
     # 4. ENGINES (Hierarchical dependency)
-    regime_engine = RegimeEngine(market_state, symbol, time_frame)
-    structure_engine = StructureEngine(market_state, symbol, time_frame)
-    liquidity_engine = LiquidityEngine(market_state, symbol, time_frame)
-    order_flow_engine = OrderFlowEngine(market_state, symbol, Logger(OrderFlowEngine))
-    order_book_engine = OrderBookEngine(market_state, symbol)
+    regime_engine = RegimeEngine(market_state, symbol, time_frame, config_manager, Logger(RegimeEngine, logger_settings))
+    structure_engine = StructureEngine(market_state, symbol, time_frame, config_manager, Logger(StructureEngine, logger_settings))
+    liquidity_engine = LiquidityEngine(market_state, symbol, time_frame, config_manager)
+    order_flow_engine = OrderFlowEngine(market_state, symbol, config_manager, Logger(OrderFlowEngine, logger_settings))
+    order_book_engine = OrderBookEngine(market_state, symbol, config_manager)
 
     scoring_engine = ScoringEngine(
         structure_engine,
@@ -75,20 +79,22 @@ async def main():
         order_flow_engine,
         regime_engine,
         order_book_engine,
-        Logger(ScoringEngine)
+        config_manager,
+        Logger(ScoringEngine, logger_settings)
     )
 
-    portfolio_engine = PortfolioEngine(initial_balance, Logger(PortfolioEngine))
-    risk_engine = RiskEngine()
+    portfolio_engine = PortfolioEngine(initial_balance, Logger(PortfolioEngine, logger_settings))
+    risk_engine = RiskEngine(config_manager, Logger(RiskEngine, logger_settings))
 
     execution_engine = ExecutionEngine(
         market_state,
         portfolio_engine,
-        risk_engine
+        risk_engine,
+        config_manager
     )
 
     # 5. NOTIFIER
-    notifier = ToastNotifier(Logger(ToastNotifier))
+    notifier = ToastNotifier(Logger(ToastNotifier, logger_settings))
 
     # 6. TRADING LOOP
     trading_loop = TradingLoop(
@@ -105,7 +111,8 @@ async def main():
         risk_engine,
         execution_engine,
         notifier,
-        Logger(TradingLoop)
+        config_manager,
+        Logger(TradingLoop, logger_settings)
     )
 
     try:

@@ -33,7 +33,7 @@ class CandlesDataLoader(ILoader):
         }
 
         try:
-            self._logger.info(f"Fetching candles for {symbol} - {timeframe}")
+            self._logger.info(f"[FETCHING CANDLES] url={self._url} params={params}")
             response = requests.get(self._url, params=params)
             response.raise_for_status()
             raw_data = response.json()
@@ -79,7 +79,7 @@ class CandlesDataLoader(ILoader):
             return result
 
         except Exception as exception:
-            self._logger.error(f"Error getting candlestick data: {exception}")
+            self._logger.error(f"[FETCHING CANDLES] {exception}")
 
     def load(self):
         current_timestamp = int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -90,7 +90,6 @@ class CandlesDataLoader(ILoader):
                                                 time_frame, 
                                                 self._max_length, 
                                                 current_timestamp)
-            self._logger.info(f"Loading candles: {self._symbol}")
             for candleResult in candlesResult:
 
                 candle = Candle(
@@ -118,5 +117,3 @@ class CandlesDataLoader(ILoader):
                 )
 
                 self._candles_state.add(candle)
-    
-    

@@ -1,7 +1,7 @@
-from dataclasses import dataclass
-from typing import Dict, Any
 import math
 
+from dataclasses import dataclass
+from typing import Dict, Any
 
 @dataclass(slots=True)
 class Candle:
@@ -27,10 +27,6 @@ class Candle:
     taker_buy_quote_volume: float
 
     is_closed: bool
-
-    # =====================================================
-    # VALIDATION
-    # =====================================================
 
     def validate(self):
 
@@ -67,10 +63,6 @@ class Candle:
                 "Negative volume"
             )
 
-    # =====================================================
-    # PARSER
-    # =====================================================
-
     @staticmethod
     def from_json(data: Dict[str, Any]):
 
@@ -104,10 +96,6 @@ class Candle:
 
         return candle
 
-    # =====================================================
-    # SERIALIZATION
-    # =====================================================
-
     def to_dict(self):
 
         return {
@@ -137,3 +125,22 @@ class Candle:
 
             "is_closed": self.is_closed
         }
+    
+    def __str__(self):
+
+        return (
+            f"Candle(symbol={self.symbol}, "
+            f"timeframe={self.timeframe}, "
+            f"open_time={self.open_time}, "
+            f"close_time={self.close_time}, "
+            f"open={self.open}, "
+            f"high={self.high}, "
+            f"low={self.low}, "
+            f"close={self.close}, "
+            f"volume={self.volume}, "
+            f"quote_asset_volume={self.quote_asset_volume}, "
+            f"trades={self.trades}, "
+            f"taker_buy_base_volume={self.taker_buy_base_volume}, "
+            f"taker_buy_quote_volume={self.taker_buy_quote_volume}, "
+            f"is_closed={self.is_closed})"
+        )
