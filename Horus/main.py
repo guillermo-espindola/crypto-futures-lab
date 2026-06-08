@@ -2,6 +2,8 @@ import asyncio
 
 from app.trading_loop import TradingLoop
 
+from config.config_manager import ConfigManager
+
 from engines.execution_engine import ExecutionEngine
 from engines.liquidity_engine import LiquidityEngine
 from engines.order_flow_engine import OrderFlowEngine
@@ -22,49 +24,59 @@ from notification.toast_notifier import ToastNotifier
 from state.candles_state import CandlesState
 from state.market_state import MarketState
 from state.orderbook_state import OrderBookState
+from state.aggregate_trade_state import AggregateTradeState
+from state.liquidation_state import LiquidationState
+from state.trade_state import TradeState
 
-from utils.config_manager import ConfigManager
 from utils.logger import Logger
 from utils.logger_settings import LoggerSettings
 
 async def main():
-    # 1. CONFIGURATION
-    path_config_file = "config.json"
     logger_settings = LoggerSettings(enable_file_logging=True, enable_console_logging=True)
-    config_manager = ConfigManager(path_config_file, Logger(ConfigManager, logger_settings))
-    general_settings = config_manager.settings.general
+    config_manager = ConfigManager("config.json", Logger(ConfigManager, logger_settings))
+    app_config = config_manager.get_config()
 
+    symbol = config_manager.get_config().market.symbol
+    time_frame = config_manager.get_config().market.timeframe
+    time_frames = config_manager.get_config().market.timeframes
+    max_candles = config_manager.get_config().market.max_candles
+    max_agg_trades = config_manager.get_config().market.max_agg_trades
+    max_liquidations = config_manager.get_config().market.max_liquidations
+    max_trades = config_manager.get_config().market.max_trades
+    initial_balance = config_manager.get_config().portfolio.initial_balance
 
-    symbol = general_settings["symbol"]
-    time_frame = general_settings["time_frame"]
-    time_frames = general_settings["time_frames"]
-    max_candles = general_settings["max_candles"]
-    initial_balance = general_settings["initial_balance"]
+    kafka_topics = config_manager.get_config().kafka.topics
+    kafka_bootstrap_server = config_manager.get_config().kafka.bootstrap_server
+    kafka_group_id = config_manager.get_config().kafka.group_id
 
-    # 2. STATE
-    candles_state = CandlesState(max_candles, Logger(CandlesState, logger_settings))
+    candles_state = CandlesState(max_candles,
+                                 Logger(CandlesState, logger_settings))
     order_book_state = OrderBookState(Logger(OrderBookState, logger_settings))
-    market_state = MarketState(symbol, candles_state, order_book_state)
+    aggregate_trade_state = AggregateTradeState(max_agg_trades)
+    liquidation_state = LiquidationState(max_liquidations)
+    trades_state = TradeState(max_trades)
+
+    market_state = MarketState(symbol,
+                               candles_state,
+                               order_book_state,
+                               aggregate_trade_state,
+                               liquidation_state,
+                               trades_state)
 
     # 3. LOADER & CONSUMER
-    candles_data_loader = CandlesDataLoader(symbol, time_frames, max_candles, candles_state, Logger(CandlesDataLoader, logger_settings))
+    candles_data_loader = CandlesDataLoader(symbol,
+                                            time_frames,
+                                            max_candles,
+                                            candles_state,
+                                            Logger(CandlesDataLoader, logger_settings))
     orderbook_data_loader = OrderBookDataLoader(symbol, 100, order_book_state, Logger(OrderBookDataLoader, logger_settings))
-    event_dispatcher = EventDispatcher(market_state, Logger(EventDispatcher, logger_settings))
-    kafka_consumer = KafkaConsumer(
-        [
-        "Candles",
-        "Trades",
-        "Orderbook",
-        "Liquidations",
-        "AggregateTrades"
-    ], # Topics list usually handled inside or in config.json
-        "localhost:29092",
-        "hft-trading-loop",
-        event_dispatcher,
-        Logger(KafkaConsumer, logger_settings)
-    )
-    # Note: In a real scenario, we'd use the exact values from config.json general/kafka section
-    # For now, we use defaults or the JSON config mapping.
+    event_dispatcher = EventDispatcher(market_state,
+                                       Logger(EventDispatcher, logger_settings))
+    kafka_consumer = KafkaConsumer( kafka_topics, 
+                                   kafka_bootstrap_server,
+                                   kafka_group_id,
+                                   event_dispatcher,
+                                   Logger(KafkaConsumer, logger_settings))
 
     # 4. ENGINES (Hierarchical dependency)
     regime_engine = RegimeEngine(market_state, symbol, time_frame, config_manager, Logger(RegimeEngine, logger_settings))

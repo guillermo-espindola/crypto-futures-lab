@@ -1,6 +1,6 @@
 import numpy as np
-from typing import Dict, Tuple
-from utils.config_manager import ConfigManager
+from typing import Tuple
+from config.config_manager import ConfigManager
 from utils.logger import Logger
 from engines.structure_engine import StructureEngine
 from engines.liquidity_engine import LiquidityEngine
@@ -60,10 +60,10 @@ class ScoringEngine:
         regime_val = self.regime.regime_score()
 
         # 2. Weights from config (driven by the active mode)
-        w_struct = self.config.get("scoring", "long_bias_weight") or 0.6
-        w_flow = self.config.get("scoring", "flow_weight") or 0.3
-        w_regime = self.config.get("scoring", "regime_weight") or 0.1
-        w_book = self.config.get("scoring", "book_weight") or 0.15 # Default weight for OB
+        w_struct = self.config.get_config().scoring.long_bias_weight
+        w_flow = self.config.get_config().scoring.long_bias_weight
+        w_regime = self.config.get_config().scoring.regime_weight
+        w_book = self.config.get_config().scoring.book_weight
 
         # 3. Long Components
         struct_long = self.structure.bos_up(atr)

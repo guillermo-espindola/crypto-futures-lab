@@ -6,58 +6,30 @@ from models.trade import Trade
 
 class TradeState:
 
-    def __init__(
-        self,
-        maxlen=10000
-    ):
+    def __init__(self, maxlen):
+        self._maxlen = maxlen
+        self._data: Dict[str, deque] = {}
 
-        self.maxlen = maxlen
-
-        self.data: Dict[
-            str,
-            deque
-        ] = {}
-
-    # =====================================================
-    # ADD
-    # =====================================================
-
-    def add(
-        self,
-        trade: Trade
-    ):
+    def add(self, trade: Trade):
 
         symbol = trade.symbol
 
-        if symbol not in self.data:
+        if symbol not in self._data:
 
-            self.data[symbol] = deque(
-                maxlen=self.maxlen
+            self._data[symbol] = deque(
+                maxlen=self._maxlen
             )
 
-        self.data[symbol].append(trade)
+        self._data[symbol].append(trade)
 
-    # =====================================================
-    # GET
-    # =====================================================
-
-    def get(
-        self,
-        symbol
-    ) -> List[Trade]:
+    def get(self, symbol) -> List[Trade]:
 
         return list(
-            self.data.get(symbol, [])
+            self._data.get(symbol, [])
         )
+    
 
-    # =====================================================
-    # LAST
-    # =====================================================
-
-    def last(
-        self,
-        symbol
-    ):
+    def last(self, symbol):
 
         trades = self.get(symbol)
 

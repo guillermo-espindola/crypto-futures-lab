@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
-from typing import Optional, Dict
-from models.candle_snapshot import CandleSnapshot
 
+from config.config_manager import ConfigManager
 from state.market_state import MarketState
-from utils.config_manager import ConfigManager
 from utils.logger_interface import ILogger
 
 class StructureEngine:
@@ -38,7 +36,7 @@ class StructureEngine:
             self._cache = {}
             return
 
-        swing_window = self.config.get("structure", "SWING_WINDOW") or 5
+        swing_window = self.config.get_config().structure.swing_window
 
         highs = df["high"].to_numpy(dtype=np.float64)
         lows = df["low"].to_numpy(dtype=np.float64)

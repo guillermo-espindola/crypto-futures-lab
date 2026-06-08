@@ -6,61 +6,32 @@ from models.aggregate_trade import AggregateTrade
 
 class AggregateTradeState:
 
-    def __init__(
-        self,
-        maxlen=10000
-    ):
+    def __init__(self, maxlen):
 
-        self.maxlen = maxlen
+        self._maxlen = maxlen
+        self._data: Dict[str, deque] = {}
 
-        self.data: Dict[
-            str,
-            deque
-        ] = {}
-
-    # =====================================================
-    # ADD
-    # =====================================================
-
-    def add(
-        self,
-        aggregate_trade: AggregateTrade
-    ):
+    def add(self, aggregate_trade: AggregateTrade):
 
         symbol = aggregate_trade.symbol
 
-        if symbol not in self.data:
+        if symbol not in self._data:
 
-            self.data[symbol] = deque(
-                maxlen=self.maxlen
+            self._data[symbol] = deque(
+                maxlen=self._maxlen
             )
 
-        self.data[symbol].append(aggregate_trade)
+        self._data[symbol].append(aggregate_trade)
 
-    # =====================================================
-    # GET
-    # =====================================================
-
-    def get(
-        self,
-        symbol
-    ) -> List[AggregateTrade]:
+    def get(self, symbol) -> List[AggregateTrade]:
 
         return list(
-            self.data.get(symbol, [])
+            self._data.get(symbol, [])
         )
 
-    # =====================================================
-    # LAST
-    # =====================================================
-
-    def last(
-        self,
-        symbol
-    ):
+    def last(self, symbol):
 
         aggregate_trades = self.get(symbol)
-
         if not aggregate_trades:
             return None
 

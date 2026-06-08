@@ -22,10 +22,6 @@ class OrderBook:
 
     asks: List[Tuple[float, float]]
 
-    # =====================================================
-    # VALIDATION
-    # =====================================================
-
     def validate(self):
 
         for side in [self.bids, self.asks]:
@@ -45,10 +41,6 @@ class OrderBook:
                     raise ValueError(
                         "Negative qty"
                     )
-
-    # =====================================================
-    # PARSER
-    # =====================================================
 
     @staticmethod
     def from_json(data):
@@ -87,10 +79,6 @@ class OrderBook:
 
         return orderbook
 
-    # =====================================================
-    # BEST BID
-    # =====================================================
-
     def best_bid(self):
 
         if not self.bids:
@@ -99,11 +87,7 @@ class OrderBook:
         return max(
             self.bids,
             key=lambda x: x[0]
-        )
-
-    # =====================================================
-    # BEST ASK
-    # =====================================================
+        )    
 
     def best_ask(self):
 

@@ -1,16 +1,11 @@
 from typing import Dict, List, Tuple, Optional
+
 from models.orderbook import OrderBook
 from models.orderbook_snapshot import OrderBookSnapshot
-from utils.logger import Logger
+
 from utils.logger_interface import ILogger
 
 class OrderBookState:
-    """
-    Manages a local order book for multiple symbols.
-    Implements the Binance Local Order Book logic:
-    1. Load Snapshot (OrderBookSnapshot)
-    2. Apply Incremental Updates (OrderBook)
-    """
 
     def __init__(self, logger: ILogger):
         # symbol -> {"bids": {price: qty}, "asks": {price: qty}}
@@ -21,9 +16,6 @@ class OrderBookState:
         self._logger = logger
 
     def apply_snapshot(self, symbol: str, snapshot: OrderBookSnapshot):
-        """
-        Initializes the local book with a full snapshot from REST API.
-        """
         bids = {float(p): float(q) for p, q in snapshot.bids}
         asks = {float(p): float(q) for p, q in snapshot.asks}
 
@@ -37,9 +29,6 @@ class OrderBookState:
         self._logger.info(f"OrderBook snapshot applied for {symbol}. ID: {snapshot.final_update_id}")
 
     def update(self, update: OrderBook):
-        """
-        Applies an incremental depth update from the stream.
-        """
         symbol = update.symbol
         if symbol not in self._books:
             self._logger.warn(f"Received update for {symbol} but no snapshot is loaded. Skipping.")

@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, Optional
 from models.candle_snapshot import CandleSnapshot
 
 from state.market_state import MarketState
-from utils.config_manager import ConfigManager
+from config.config_manager import ConfigManager
 from utils.logger_interface import ILogger
 
 class RegimeEngine:
@@ -15,7 +14,12 @@ class RegimeEngine:
     Optimized to use CandleSnapshots and dynamic execution feedback.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, timeframe: str, config_manager: ConfigManager, logger: ILogger):
+    def __init__(self,
+                 market_state: MarketState,
+                 symbol: str,
+                 timeframe: str,
+                 config_manager: ConfigManager,
+                 logger: ILogger):
         self.market_state = market_state
         self.symbol = symbol
         self.timeframe = timeframe
@@ -41,7 +45,7 @@ class RegimeEngine:
             self._current_results = {}
             return
 
-        period = self.config.get("regime", "DEFAULT_PERIOD") or 14
+        period = self.config.get_config().regime.default_period
 
         # 1. ATR is now provided by the snapshot
         current_atr = snapshot.atr
@@ -98,7 +102,7 @@ class RegimeEngine:
         """
         Adjusts the volatility baseline based on real market friction.
         """
-        expected_slippage = self.config.get("execution", "slippage_factor") or 0.0005
+        expected_slippage = self.config.get_config().execution.slippage_factor
         ratio = relative_slippage / (expected_slippage + 1e-9)
 
         alpha = 0.1

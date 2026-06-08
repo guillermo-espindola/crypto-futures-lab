@@ -1,42 +1,35 @@
 import pandas as pd
 import numpy as np
 from typing import List, Optional, Dict
-from dataclasses import dataclass, field
-from config.state_settings import MAX_CANDLES, MAX_AGGREGATE_TRADES, MAX_LIQUIDATIONS, MAX_TRADES
 
+from models.aggregate_trade import AggregateTrade
+from models.candle import Candle
+from models.candle_snapshot import CandleSnapshot
+from models.liquidation import Liquidation
+from models.market_snapshot import MarketSnapshot
+from models.orderbook import OrderBook
 from models.orderbook_snapshot import OrderBookSnapshot
-from state.candles_state import CandlesState
+from models.trade import Trade
+
 from state.aggregate_trade_state import AggregateTradeState
+from state.candles_state import CandlesState
 from state.orderbook_state import OrderBookState
 from state.liquidation_state import LiquidationState
 from state.trade_state import TradeState
 
-from models.candle import Candle
-from models.aggregate_trade import AggregateTrade
-from models.orderbook import OrderBook
-from models.liquidation import Liquidation
-from models.trade import Trade
-from models.candle_snapshot import CandleSnapshot
-
-@dataclass
-class MarketSnapshot:
-    symbol: str
-    candles_df: pd.DataFrame
-    trades: List[Trade]
-    orderbook: Optional[OrderBookSnapshot]
-    liquidations: List[Liquidation]
-    timestamp: float
-
 class MarketState:
     def __init__(self, symbol: str,
-                 candlesState: CandlesState,
-                 orderbookState: OrderBookState):
+                 candles_state: CandlesState,
+                 orderbook_state: OrderBookState,
+                 aggregate_trade_state: AggregateTradeState,
+                 liquidation_state: LiquidationState,
+                 trades_state: TradeState):
         self.symbol = symbol
-        self._candles_state = candlesState
-        self._aggregate_trades = AggregateTradeState(maxlen=MAX_AGGREGATE_TRADES)
-        self._orderbooks = orderbookState
-        self._liquidations = LiquidationState(maxlen=MAX_LIQUIDATIONS)
-        self._trades = TradeState(maxlen=MAX_TRADES)
+        self._candles_state = candles_state
+        self._orderbooks = orderbook_state
+        self._aggregate_trades = aggregate_trade_state
+        self._liquidations = liquidation_state
+        self._trades = trades_state
 
         # Caching layer
         self._df_cache: Dict[str, pd.DataFrame] = {}

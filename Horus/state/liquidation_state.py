@@ -6,60 +6,31 @@ from models.liquidation import Liquidation
 
 class LiquidationState:
 
-    def __init__(
-        self,
-        maxlen=5000
-    ):
+    def __init__( self, maxlen):
+        self._maxlen = maxlen
+        self._data: Dict[str, deque] = {}
 
-        self.maxlen = maxlen
-
-        self.data: Dict[
-            str,
-            deque
-        ] = {}
-
-    # =====================================================
-    # ADD
-    # =====================================================
-
-    def add(
-        self,
-        liquidation: Liquidation
-    ):
+    def add(self, liquidation: Liquidation):
 
         symbol = liquidation.symbol
 
-        if symbol not in self.data:
+        if symbol not in self._data:
 
-            self.data[symbol] = deque(
-                maxlen=self.maxlen
+            self._data[symbol] = deque(
+                maxlen=self._maxlen
             )
 
-        self.data[symbol].append(
+        self._data[symbol].append(
             liquidation
         )
 
-    # =====================================================
-    # GET
-    # =====================================================
-
-    def get(
-        self,
-        symbol
-    ) -> List[Liquidation]:
+    def get(self, symbol) -> List[Liquidation]:
 
         return list(
-            self.data.get(symbol, [])
+            self._data.get(symbol, [])
         )
 
-    # =====================================================
-    # LAST
-    # =====================================================
-
-    def last(
-        self,
-        symbol
-    ):
+    def last(self, symbol):
 
         liqs = self.get(symbol)
 

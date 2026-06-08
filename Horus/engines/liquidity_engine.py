@@ -1,7 +1,7 @@
 import numpy as np
 
 from state.market_state import MarketState
-from utils.config_manager import ConfigManager
+from config.config_manager import ConfigManager
 
 class LiquidityEngine:
     """
@@ -32,7 +32,7 @@ class LiquidityEngine:
         df = self.market_state.get_candles_df(self.symbol, self.timeframe)
         if df.empty: return 0.0
 
-        lookback = self.config.get("liquidity", "lookback_period") or 30
+        lookback = self.config.get_config().liquidity.lookback_period
         if len(df) < lookback + 2: return 0.0
 
         window = df["low"].iloc[-lookback-1:-1]
@@ -59,7 +59,7 @@ class LiquidityEngine:
         df = self.market_state.get_candles_df(self.symbol, self.timeframe)
         if df.empty: return 0.0
 
-        lookback = self.config.get("liquidity", "lookback_period") or 30
+        lookback = self.config.get_config().liquidity.lookback_period
         if len(df) < lookback + 2: return 0.0
 
         window = df["high"].iloc[-lookback-1:-1]

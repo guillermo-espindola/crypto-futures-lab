@@ -1,13 +1,13 @@
 import numpy as np
 from collections import deque
-from typing import List, Tuple, Optional
+from typing import List
 from dataclasses import dataclass
 
 from state.market_state import MarketState
-from utils.config_manager import ConfigManager
+from config.config_manager import ConfigManager
 from utils.logger_interface import ILogger
 from models.trade import Trade
-from models.orderbook import OrderBook
+
 
 @dataclass
 class FlowState:
@@ -78,7 +78,7 @@ class OrderFlowEngine:
         trades = self.market_state.get_trades(self.symbol)
         if len(trades) < 50: return
 
-        window = self.config.get("order_flow", "window_size") or 50
+        window = self.config.get_config().order_flow.window_size
         recent = trades[-window:]
 
         delta = self._calculate_delta(recent)

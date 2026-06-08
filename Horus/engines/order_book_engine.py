@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple, Dict, List
 from state.market_state import MarketState
-from utils.config_manager import ConfigManager
+from config.config_manager import ConfigManager
 
 class OrderBookEngine:
     """

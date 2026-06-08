@@ -2,6 +2,7 @@
 import requests
 
 from datetime import datetime, timezone
+
 from infrastructure.loader_interface import ILoader
 from models.candle import Candle
 from state.candles_state import CandlesState

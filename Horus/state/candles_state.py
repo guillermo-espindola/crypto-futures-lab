@@ -1,7 +1,9 @@
 from collections import deque
+from typing import Dict, List, Optional
+
 from models.candle_event import CandleEvent
 from models.candle import Candle
-from typing import Dict, List, Optional
+
 from utils.logger_interface import ILogger
 
 class CandlesState:

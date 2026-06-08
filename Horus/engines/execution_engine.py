@@ -6,7 +6,7 @@ from models.trade_execution import TradeExecution
 from state.market_state import MarketState
 from engines.risk_engine import RiskEngine
 from engines.portfolio_engine import PortfolioEngine
-from utils.config_manager import ConfigManager
+from config.config_manager import ConfigManager
 
 
 class ExecutionEngine:
@@ -30,7 +30,7 @@ class ExecutionEngine:
         take_profit: float,
         ) -> Optional[TradeExecution]:
 
-        taker_fee = self.config_manager.get("execution", "taker_fee") or 0.0004
+        taker_fee = self.config_manager.get_config().execution.taker_fee
         notional = market_price * quantity
         fees = notional * taker_fee
 

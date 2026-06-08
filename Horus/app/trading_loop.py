@@ -19,7 +19,7 @@ from engines.scoring_engine import ScoringEngine
 from engines.portfolio_engine import PortfolioEngine
 from engines.risk_engine import RiskEngine
 from engines.execution_engine import ExecutionEngine
-from utils.config_manager import ConfigManager
+from config.config_manager import ConfigManager
 from utils.logger_interface import ILogger
 
 class TradingLoop:
@@ -70,12 +70,12 @@ class TradingLoop:
         self.last_trade_timestamp = 0.0
 
     def _update_ema(self, long_score: float, short_score: float):
-        a = self._config_manager.get("scoring", "ema_alpha") or 0.25
+        a = self._config_manager.get_config().scoring.ema_alpha
         self.long_score_ema = a * long_score + (1 - a) * self.long_score_ema
         self.short_score_ema = a * short_score + (1 - a) * self.short_score_ema
 
     def _update_confirmations(self):
-        threshold = self._config_manager.get("scoring", "confirmation_threshold") or 2
+        threshold = self._config_manager.get_config().scoring.confirmation_threshold
 
         if self.long_score_ema > 0.5: # Calibrated midpoint
             self.long_confirmations += 1
@@ -89,14 +89,14 @@ class TradingLoop:
 
     def _cooldown_active(self) -> bool:
         now = datetime.now().timestamp()
-        cooldown = self._config_manager.get("behavior", "cooldown_seconds") or 10
+        cooldown = self._config_manager.get_config().behavior.cooldown_seconds
         return (now - self.last_trade_timestamp) < cooldown
 
     def _generate_position_type(self) -> PositionType:
         if self._cooldown_active():
             return PositionType.NONE
 
-        threshold = self._config_manager.get("scoring", "confirmation_threshold") or 2
+        threshold = self._config_manager.get_config().scoring.confirmation_threshold
         if self.long_confirmations >= threshold and self.long_score_ema > self.short_score_ema:
             return PositionType.LONG
 
@@ -188,7 +188,7 @@ class TradingLoop:
                             position_type=position_type,
                             market_price=current_market_price,
                             quantity=position_size,
-                            leverage=self._config_manager.get("risk", "max_leverage") or 5,
+                            leverage=self._config_manager.get_config().risk.max_leverage,
                             stop_loss=stop_loss,
                             take_profit=take_profit
                         )
