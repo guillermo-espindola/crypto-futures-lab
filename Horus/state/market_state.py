@@ -17,24 +17,38 @@ from state.orderbook_state import OrderBookState
 from state.liquidation_state import LiquidationState
 from state.trade_state import TradeState
 
+from utils.aggregate_trade_candle_builder import AggregateTradeCandleBuilder
+
 class MarketState:
     def __init__(self, symbol: str,
                  candles_state: CandlesState,
                  orderbook_state: OrderBookState,
                  aggregate_trade_state: AggregateTradeState,
                  liquidation_state: LiquidationState,
-                 trades_state: TradeState):
-        self.symbol = symbol
+                 trades_state: TradeState,
+                 aggregate_trade_candle_builder: AggregateTradeCandleBuilder):
+        self._symbol = symbol
         self._candles_state = candles_state
-        self._orderbooks = orderbook_state
-        self._aggregate_trades = aggregate_trade_state
-        self._liquidations = liquidation_state
-        self._trades = trades_state
+        self._orderbook_state = orderbook_state
+        self._aggregate_trade_state = aggregate_trade_state
+        self._liquidation_state = liquidation_state
+        self._trade_state = trades_state
+        self._aggregate_trade_candle_builder = aggregate_trade_candle_builder
+
+        self._current_price: float = 0.0
 
         # Caching layer
         self._df_cache: Dict[str, pd.DataFrame] = {}
         self._last_candle_time: Dict[str, int] = {}
         self._snapshot_cache: Dict[str, CandleSnapshot] = {}
+
+    # CURRENT PRICE
+
+    def set_current_price(self, current_price: float):
+        self._current_price = current_price
+    
+    def get_current_price(self) -> float:
+        return self._current_price
 
     # =====================================================
     # CANDLES
@@ -110,76 +124,68 @@ class MarketState:
 
         self._snapshot_cache[timeframe] = snapshot
         return snapshot
-
-    def get_last_candle(self, symbol: str, timeframe: str) -> Optional[Candle]:
-        return self._candles_state.last(symbol, timeframe)
-
+    
     # =====================================================
     # AGGREGATE TRADES
     # =====================================================
 
     def add_aggregate_trade(self, aggregate_trade: AggregateTrade):
-        self._aggregate_trades.add(aggregate_trade)
+        self._aggregate_trade_state.add(aggregate_trade)
+        self._aggregate_trade_candle_builder.add(aggregate_trade)
 
     def get_aggregate_trades(self, symbol: str) -> List[AggregateTrade]:
-        return self._aggregate_trades.get(symbol)
+        return self._aggregate_trade_state.get(symbol)
 
     def last_aggregate_trade(self, symbol: str) -> Optional[AggregateTrade]:
-        return self._aggregate_trades.last(symbol)
+        return self._aggregate_trade_state.last(symbol)
 
     # =====================================================
     # TRADES
     # =====================================================
 
     def add_trade(self, trade: Trade):
-        self._trades.add(trade)
+        self._trade_state.add(trade)
 
     def get_trades(self, symbol: str) -> List[Trade]:
-        return self._trades.get(symbol)
+        return self._trade_state.get(symbol)
 
     def last_trade(self, symbol: str) -> Optional[Trade]:
-        return self._trades.last(symbol)
+        return self._trade_state.last(symbol)
 
     # =====================================================
     # ORDERBOOKS
     # =====================================================
 
     def add_orderbook(self, ob: OrderBook):
-        self._orderbooks.update(ob)
+        self._orderbook_state.update(ob)
 
     def get_orderbook(self, symbol: str) -> Optional[OrderBookSnapshot]:
-        return self._orderbooks.get(symbol)
+        return self._orderbook_state.get(symbol)
 
     def get_sorted_bids(self, symbol: str, limit: int = 20) -> List[Tuple[float, float]]:
         """Returns top N bids from the local book."""
-        return self._orderbooks.get_sorted_bids(symbol, limit)
+        return self._orderbook_state.get_sorted_bids(symbol, limit)
 
     def get_sorted_asks(self, symbol: str, limit: int = 20) -> List[Tuple[float, float]]:
         """Returns top N asks from the local book."""
-        return self._orderbooks.get_sorted_asks(symbol, limit)
+        return self._orderbook_state.get_sorted_asks(symbol, limit)
 
     # =====================================================
     # LIQUIDATIONS
     # =====================================================
 
     def add_liquidation(self, liq: Liquidation):
-        self._liquidations.add(liq)
+        self._liquidation_state.add(liq)
 
     def get_liquidations(self, symbol: str) -> List[Liquidation]:
-        return self._liquidations.get(symbol)
+        return self._liquidation_state.get(symbol)
 
     def last_liquidation(self, symbol: str) -> Optional[Liquidation]:
-        return self._liquidations.last(symbol)
+        return self._liquidation_state.last(symbol)
 
     # =====================================================
     # HELPERS
     # =====================================================
-
-    def get_last_price(self, symbol: str, timeframe: str) -> float:
-        candle = self.get_last_candle(symbol, timeframe)
-        if candle:
-            return candle.close
-        return 0.0
 
     def get_snapshot(self, symbol: str, timeframe: str, timestamp: float) -> MarketSnapshot:
         """

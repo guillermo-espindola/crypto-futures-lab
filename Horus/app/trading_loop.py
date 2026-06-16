@@ -122,7 +122,7 @@ class TradingLoop:
             while True:
                 # 1. UPDATE MARKET DATA
                 await self._kafka_consumer.poll_events()
-                current_market_price = self._market_state.get_last_price(self._symbol, "1m")
+                current_market_price = self._market_state.get_current_price()
 
                 # 2. HIERARCHICAL PIPELINE
 

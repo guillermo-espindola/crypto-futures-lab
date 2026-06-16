@@ -16,7 +16,9 @@ class EventDispatcher:
             event_type = event.get("e")
 
             if event_type == "kline":
-                self.market_state.add_candle(Candle.from_json(event))
+                candle = Candle.from_json(event)
+                self.market_state.set_current_price(candle.close)
+                self.market_state.add_candle(candle)
 
             elif event_type == "aggTrade":
                 self.market_state.add_aggregate_trade(AggregateTrade.from_json(event))
