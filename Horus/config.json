@@ -1,16 +1,16 @@
 {
   "market": {
-    "symbol": "UBUSDT",
+    "symbol": "VELVETUSDT",
     "timeframe": "1m",
     "timeframes": ["1m"],
     "max_candles": 250,
-    "max_agg_trades": 10000,
+    "max_agg_trades": 1000,
     "max_liquidations": 100,
-    "max_trades": 10000
+    "max_trades": 1000
   },
 
   "portfolio": {
-    "initial_balance": 10000.0
+    "initial_balance": 100.0
   },
 
   "risk": {
@@ -61,7 +61,7 @@
   "kafka": {
     "bootstrap_server": "localhost:29092",
     "topics": [ "Candles", "Trades", "Orderbook", "Liquidations", "AggregateTrades"],
-    "group_id": "hft-trading-loop"
+    "group_id": "horus-engine"
   },
   "logger": {
     "enable_file_logging": true,
