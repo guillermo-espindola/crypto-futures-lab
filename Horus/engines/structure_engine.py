@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
+from typing import Optional
 
 from config.config_manager import ConfigManager
 from state.market_state import MarketState
@@ -14,12 +15,11 @@ class StructureEngine:
     Optimized for cached data and volatility normalization.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, timeframe: str, config_manager: ConfigManager, logger: ILogger):
-        self.market_state = market_state
-        self.symbol = symbol
-        self.timeframe = timeframe
-        self.config = config_manager
-        self.logger = logger
+    def __init__(self, market_state: MarketState, timeframe: str, config_manager: ConfigManager, logger: ILogger):
+        self._market_state = market_state
+        self._timeframe = timeframe
+        self._config = config_manager
+        self._logger = logger
 
         self._cache = {}
         self._last_candle_time = None
@@ -36,7 +36,7 @@ class StructureEngine:
             self._cache = {}
             return
 
-        swing_window = self.config.get_config().structure.swing_window
+        swing_window = self._config.get_config().structure.swing_window
 
         highs = df["high"].to_numpy(dtype=np.float64)
         lows = df["low"].to_numpy(dtype=np.float64)
@@ -58,11 +58,11 @@ class StructureEngine:
         }
 
     def _ensure_computed(self):
-        snapshot = self.market_state.get_candle_snapshot(self.symbol, self.timeframe)
+        snapshot = self._market_state.get_candle_snapshot(self._timeframe)
         if not snapshot:
             return
 
-        df = self.market_state.get_candles_df(self.symbol, self.timeframe)
+        df = self._market_state.get_timeframe_candles_df(self._timeframe)
         if df.empty:
             return
 
@@ -80,7 +80,7 @@ class StructureEngine:
         if not self._cache or self._cache["resistance"] is None or atr <= 0:
             return 0.0
 
-        df = self.market_state.get_candles_df(self.symbol, self.timeframe)
+        df = self._market_state.get_timeframe_candles_df(self._timeframe)
         close = float(df["close"].iloc[-1])
         displacement = close - self._cache["resistance"]
 
@@ -95,7 +95,7 @@ class StructureEngine:
         if not self._cache or self._cache["support"] is None or atr <= 0:
             return 0.0
 
-        df = self.market_state.get_candles_df(self.symbol, self.timeframe)
+        df = self._market_state.get_timeframe_candles_df(self._timeframe)
         close = float(df["close"].iloc[-1])
         displacement = self._cache["support"] - close
 

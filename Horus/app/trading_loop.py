@@ -24,7 +24,6 @@ from utils.logger_interface import ILogger
 
 class TradingLoop:
     def __init__(self,
-                 symbol: str,
                  market_state: MarketState,
                  kafka_consumer: KafkaConsumer,
                  structure_engine: StructureEngine,
@@ -40,7 +39,6 @@ class TradingLoop:
                  config_manager: ConfigManager,
                  logger: ILogger):
 
-        self._symbol = symbol
         self._market_state = market_state
         self._kafka_consumer = kafka_consumer
         self._structure_engine = structure_engine
@@ -57,67 +55,66 @@ class TradingLoop:
         self._config_manager = config_manager
 
         # Signal Smoothing (EMA)
-        self.last_resistance: Optional[float] = None
-        self.last_support: Optional[float] = None
-        self.long_score_ema = 0.0
-        self.short_score_ema = 0.0
+        self._last_resistance: Optional[float] = None
+        self._last_support: Optional[float] = None
+        self._long_score_ema = 0.0
+        self._short_score_ema = 0.0
 
         # Confirmations
-        self.long_confirmations = 0
-        self.short_confirmations = 0
+        self._long_confirmations = 0
+        self._short_confirmations = 0
 
         # Cooldown
-        self.last_trade_timestamp = 0.0
+        self._last_trade_timestamp = 0.0
 
     def _update_ema(self, long_score: float, short_score: float):
         a = self._config_manager.get_config().scoring.ema_alpha
-        self.long_score_ema = a * long_score + (1 - a) * self.long_score_ema
-        self.short_score_ema = a * short_score + (1 - a) * self.short_score_ema
+        self._long_score_ema = a * long_score + (1 - a) * self._long_score_ema
+        self._short_score_ema = a * short_score + (1 - a) * self._short_score_ema
 
     def _update_confirmations(self):
         threshold = self._config_manager.get_config().scoring.confirmation_threshold
 
-        if self.long_score_ema > 0.5: # Calibrated midpoint
-            self.long_confirmations += 1
+        if self._long_score_ema > 0.5: # Calibrated midpoint
+            self._long_confirmations += 1
         else:
-            self.long_confirmations = 0
+            self._long_confirmations = 0
 
-        if self.short_score_ema > 0.5:
-            self.short_confirmations += 1
+        if self._short_score_ema > 0.5:
+            self._short_confirmations += 1
         else:
-            self.short_confirmations = 0
+            self._short_confirmations = 0
 
     def _cooldown_active(self) -> bool:
         now = datetime.now().timestamp()
         cooldown = self._config_manager.get_config().behavior.cooldown_seconds
-        return (now - self.last_trade_timestamp) < cooldown
+        return (now - self._last_trade_timestamp) < cooldown
 
     def _generate_position_type(self) -> PositionType:
         if self._cooldown_active():
             return PositionType.NONE
 
         threshold = self._config_manager.get_config().scoring.confirmation_threshold
-        if self.long_confirmations >= threshold and self.long_score_ema > self.short_score_ema:
+        if self._long_confirmations >= threshold and self._long_score_ema > self._short_score_ema:
             return PositionType.LONG
 
-        if self.short_confirmations >= threshold and self.short_score_ema > self.long_score_ema:
+        if self._short_confirmations >= threshold and self._short_score_ema > self._long_score_ema:
             return PositionType.SHORT
 
         return PositionType.NONE
     
     def on_open_position(self, position: Position):
-        self.last_trade_timestamp = datetime.now().timestamp()
+        self._last_trade_timestamp = datetime.now().timestamp()
         self._notifier.notify(f"[OPEN {position.position_type.value}] Q={position.quantity:.4f} P={position.entry_price:.6f} " 
                           f"TP={position.take_profit:.6f} SL={position.stop_loss:.6f}")
 
     def on_new_candle(self, candle: Candle):
         resistance, support = self._structure_engine.get_key_levels()
         self._logger.info(f"CANDLE UPDATE: Resistance={resistance}, Support={support}")
-        self.last_resistance = resistance if resistance is not None else self.last_resistance
-        self.last_support = support if support is not None else self.last_support
+        self._last_resistance = resistance if resistance is not None else self._last_resistance
+        self._last_support = support if support is not None else self._last_support
 
     async def run(self, sleep_time: float):
-        self._logger.info(f"[{datetime.now()}] Trading loop started for {self._symbol}")
         try:
             while True:
                 # 1. UPDATE MARKET DATA
@@ -151,9 +148,9 @@ class TradingLoop:
                             close_reason = "TAKE PROFIT"
                         elif current_position.position_type == PositionType.SHORT and current_market_price <= current_position.take_profit:
                             close_reason = "TAKE PROFIT"
-                        elif current_position.position_type == PositionType.LONG and self.short_confirmations >= 1 and self.short_score_ema > 0.5: # 3 0.7
+                        elif current_position.position_type == PositionType.LONG and self._short_confirmations >= 1 and self._short_score_ema > 0.5: # 3 0.7
                             close_reason = "REVERSE SIGNAL"
-                        elif current_position.position_type == PositionType.SHORT and self.long_confirmations >= 1 and self.long_score_ema > 0.5: # 3 0.7
+                        elif current_position.position_type == PositionType.SHORT and self._long_confirmations >= 1 and self._long_score_ema > 0.5: # 3 0.7
                             close_reason = "REVERSE SIGNAL"
 
                         if close_reason:
@@ -194,7 +191,7 @@ class TradingLoop:
                         )
 
                         if result and result.success:
-                            self.last_trade_timestamp = datetime.now().timestamp()
+                            self._last_trade_timestamp = datetime.now().timestamp()
 
                             # FEEDBACK LOOP: Send relative slippage back to RegimeEngine
                             rel_slip = abs(result.slippage / result.execution_price) if result.execution_price > 0 else 0
@@ -203,8 +200,8 @@ class TradingLoop:
                 # 5. SNAPSHOT LOG
                 portfolio_snapshot = self._portfolio_engine.get_portfolio_snapshot(current_market_price)
                 self._logger.info(f"[MARKET] Price={current_market_price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
-                self._logger.info(f"[LEVELS] Resistance={self.last_resistance}, Support={self.last_support}")
-                self._logger.info(f"[SCORES] Long={long_score:.2f} Short={short_score:.2f}, EMA_L={self.long_score_ema:.2f}, EMA_S={self.short_score_ema:.2f}")
+                self._logger.info(f"[LEVELS] Resistance={self._last_resistance}, Support={self._last_support}")
+                self._logger.info(f"[SCORES] Long={long_score:.2f} Short={short_score:.2f}, EMA_L={self._long_score_ema:.2f}, EMA_S={self._short_score_ema:.2f}")
                 self._logger.info(f"[PORTFOLIO] Equity={portfolio_snapshot.equity:.2f}, Balance={portfolio_snapshot.balance:.2f}")
 
                 await asyncio.sleep(sleep_time)

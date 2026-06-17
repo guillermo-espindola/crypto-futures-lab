@@ -1,5 +1,5 @@
 from collections import deque
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from models.candle_event import CandleEvent
 from models.candle import Candle
@@ -8,23 +8,20 @@ from utils.logger_interface import ILogger
 
 class CandlesState:
 
-    def __init__(self, max_length: int, logger: ILogger):
+    def __init__(self, max_candles: int, logger: ILogger):
 
-        self._max_length = max_length
-        self._candles_data: Dict[str, Dict[str, deque]] = {}
+        self._max_candles = max_candles
+        self._timeframe_candles: Dict[str, deque] = {}
         self._logger = logger
         
         self.new_candle_event = CandleEvent()
 
     def add(self, candle: Candle):
 
-        if candle.symbol not in self._candles_data:
-            self._candles_data[candle.symbol] = {}
+        if candle.timeframe not in self._timeframe_candles:
+            self._timeframe_candles[candle.timeframe] = deque(maxlen=self._max_candles)
 
-        if candle.timeframe not in self._candles_data[candle.symbol]:
-            self._candles_data[candle.symbol][candle.timeframe] = deque(maxlen=self._max_length)
-
-        current_candles = self._candles_data[candle.symbol][candle.timeframe]
+        current_candles = self._timeframe_candles[candle.timeframe]
 
         # UPDATE LAST CANDLE
         if (len(current_candles) > 0 and current_candles[-1].open_time == candle.open_time):
@@ -35,14 +32,5 @@ class CandlesState:
             self._logger.info(f"[ADDED] {candle}")
             self.new_candle_event.trigger(candle)
 
-    def get(self, symbol: str, timeframe:str) -> List[Candle]:
-
-        return list(self._candles_data.get(symbol, {}).get(timeframe, []))
-
-    def last(self, symbol: str, timeframe: str) -> Optional[Candle]:
-        current_candles = self.get(symbol, timeframe)
-
-        if not current_candles:
-            return None
-
-        return current_candles[-1]
+    def get_timeframe_candles(self, timeframe:str) -> List[Candle]:
+        return list(self._timeframe_candles.get(timeframe, []))

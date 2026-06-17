@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CandleSnapshot:
-    symbol: str
     timeframe: str
     timestamp: int
     open: float

@@ -6,7 +6,6 @@ from models.aggregate_trade import AggregateTrade
 from models.candle import Candle
 from models.candle_snapshot import CandleSnapshot
 from models.liquidation import Liquidation
-from models.market_snapshot import MarketSnapshot
 from models.orderbook_depth_update import OrderBookDepthUpdate
 from models.orderbook import OrderBook
 from models.trade import Trade
@@ -20,14 +19,13 @@ from state.trade_state import TradeState
 from utils.aggregate_trade_candle_builder import AggregateTradeCandleBuilder
 
 class MarketState:
-    def __init__(self, symbol: str,
+    def __init__(self,
                  candles_state: CandlesState,
                  orderbook_state: OrderBookState,
                  aggregate_trade_state: AggregateTradeState,
                  liquidation_state: LiquidationState,
                  trades_state: TradeState,
                  aggregate_trade_candle_builder: AggregateTradeCandleBuilder):
-        self._symbol = symbol
         self._candles_state = candles_state
         self._orderbook_state = orderbook_state
         self._aggregate_trade_state = aggregate_trade_state
@@ -38,8 +36,8 @@ class MarketState:
         self._current_price: float = 0.0
 
         # Caching layer
-        self._df_cache: Dict[str, pd.DataFrame] = {}
-        self._last_candle_time: Dict[str, int] = {}
+        self._timeframe_candles_df_cache: Dict[str, pd.DataFrame] = {}
+        self._last_candle_open_time: Dict[str, int] = {}
         self._snapshot_cache: Dict[str, CandleSnapshot] = {}
 
     # CURRENT PRICE
@@ -57,27 +55,28 @@ class MarketState:
     def add_candle(self, candle: Candle):
         self._candles_state.add(candle)
         # Invalidate cache if candle time changed
-        if candle.open_time != self._last_candle_time.get(candle.timeframe, 0):
-            self._df_cache.pop(candle.timeframe, None)
+        if candle.open_time != self._last_candle_open_time.get(candle.timeframe, 0):
+            self._timeframe_candles_df_cache.pop(candle.timeframe, None)
             self._snapshot_cache.pop(candle.timeframe, None)
-            self._last_candle_time[candle.timeframe] = candle.open_time
+            self._last_candle_open_time[candle.timeframe] = candle.open_time
+    
+    def add_custom_candle(self, aggregate_trade: AggregateTrade):
+        self._aggregate_trade_candle_builder.add(aggregate_trade)
 
-    def get_candles(self, symbol: str, timeframe: str) -> List[Candle]:
-        return self._candles_state.get(symbol, timeframe)
-
-    def get_candles_df(self, symbol: str, timeframe: str) -> pd.DataFrame:
+    
+    def get_timeframe_candles_df(self, timeframe: str) -> pd.DataFrame:
         """
         Returns a cached DataFrame of candles.
         Only rebuilds if the latest candle has changed.
         """
-        if timeframe in self._df_cache:
-            return self._df_cache[timeframe]
+        if timeframe in self._timeframe_candles_df_cache:
+            return self._timeframe_candles_df_cache[timeframe]
 
-        candles = self.get_candles(symbol, timeframe)
+        candles = self._candles_state.get_timeframe_candles(timeframe)
         if not candles:
             return pd.DataFrame()
 
-        df = pd.DataFrame([c.to_dict() for c in candles])
+        df = pd.DataFrame([candle.to_dict() for candle in candles])
         # Standardize numeric columns
         numeric_cols = ["open", "high", "low", "close", "volume"]
         for col in numeric_cols:
@@ -85,10 +84,10 @@ class MarketState:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
         df = df.dropna(subset=numeric_cols).reset_index(drop=True)
-        self._df_cache[timeframe] = df
+        self._timeframe_candles_df_cache[timeframe] = df
         return df
 
-    def get_candle_snapshot(self, symbol: str, timeframe: str) -> Optional[CandleSnapshot]:
+    def get_candle_snapshot(self, timeframe: str) -> Optional[CandleSnapshot]:
         """
         Returns a cached snapshot of the current candle and its key metrics (like ATR).
         Recalculates only when a new candle arrives.
@@ -96,7 +95,7 @@ class MarketState:
         if timeframe in self._snapshot_cache:
             return self._snapshot_cache[timeframe]
 
-        df = self.get_candles_df(symbol, timeframe)
+        df = self.get_timeframe_candles_df(timeframe)
         if df.empty:
             return None
 
@@ -110,7 +109,6 @@ class MarketState:
         atr = tr.ewm(span=14, adjust=False).mean().iloc[-1] if len(tr) >= 14 else df['high'].iloc[-1] - df['low'].iloc[-1]
 
         snapshot = CandleSnapshot(
-            symbol=symbol,
             timeframe=timeframe,
             timestamp=int(last_candle['open_time']),
             open=float(last_candle['open']),
@@ -131,13 +129,9 @@ class MarketState:
 
     def add_aggregate_trade(self, aggregate_trade: AggregateTrade):
         self._aggregate_trade_state.add(aggregate_trade)
-        self._aggregate_trade_candle_builder.add(aggregate_trade)
 
-    def get_aggregate_trades(self, symbol: str) -> List[AggregateTrade]:
-        return self._aggregate_trade_state.get(symbol)
-
-    def last_aggregate_trade(self, symbol: str) -> Optional[AggregateTrade]:
-        return self._aggregate_trade_state.last(symbol)
+    def get_aggregate_trades(self) -> List[AggregateTrade]:
+        return self._aggregate_trade_state.get()
 
     # =====================================================
     # TRADES
@@ -174,25 +168,5 @@ class MarketState:
     def add_liquidation(self, liq: Liquidation):
         self._liquidation_state.add(liq)
 
-    def get_liquidations(self, symbol: str) -> List[Liquidation]:
-        return self._liquidation_state.get(symbol)
-
-    def last_liquidation(self, symbol: str) -> Optional[Liquidation]:
-        return self._liquidation_state.last(symbol)
-
-    # =====================================================
-    # HELPERS
-    # =====================================================
-
-    def get_snapshot(self, symbol: str, timeframe: str, timestamp: float) -> MarketSnapshot:
-        """
-        Creates a synchronized snapshot of the market state.
-        """
-        return MarketSnapshot(
-            symbol=symbol,
-            candles_df=self.get_candles_df(symbol, timeframe),
-            trades=self.get_current_trades(symbol),
-            orderbook=self.get_orderbook(),
-            liquidations=self.get_liquidations(symbol),
-            timestamp=timestamp
-        )
+    def get_liquidations(self) -> List[Liquidation]:
+        return self._liquidation_state.get()

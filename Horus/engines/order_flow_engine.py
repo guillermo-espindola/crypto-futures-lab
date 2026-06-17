@@ -24,28 +24,27 @@ class OrderFlowEngine:
     Integrates Order Book depth to calculate real liquidity pressure.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, window_size: int, logger: ILogger):
+    def __init__(self, market_state: MarketState, window_size: int, logger: ILogger):
         self._market_state = market_state
-        self._symbol = symbol
         self._window_size = window_size
         self._logger = logger
 
         # Rolling history of impact values
-        self.impact_history = deque(maxlen=2000)
+        self._impact_history = deque(maxlen=2000)
         self._current_state = FlowState()
 
     # =====================================================
     # CORE METRICS
     # =====================================================
 
-    def _get_liquidity_depth(self) -> float:
+    def _get_liquidity_depth(self, limit: int) -> float:
         """Returns the sum of volumes in top 5 levels of the orderbook."""
         order_book = self._market_state.get_orderbook()
         if not order_book:
             return 0.0
         
-        sorted_bids = self._market_state.get_sorted_bids(5)
-        sorted_asks = self._market_state.get_sorted_asks(5)
+        sorted_bids = self._market_state.get_sorted_bids(limit)
+        sorted_asks = self._market_state.get_sorted_asks(limit)
 
         bid_vol = sum([bid[1] for bid in sorted_bids])
         ask_vol = sum([ask[1] for ask in sorted_asks])
@@ -82,28 +81,28 @@ class OrderFlowEngine:
 
         recent_trades = current_trades[-(self._window_size):]
 
-        current_delta = self._calculate_delta(recent_trades)
+        delta = self._calculate_delta(recent_trades)
         price_change = recent_trades[-1].price - recent_trades[0].price
 
         np_prices = np.array([recent_trade.price for recent_trade in recent_trades])
         volatility = np.std(np.diff(np_prices) / np_prices[:-1]) + 1e-9
 
         # New Liquidity Pressure: Delta / Total Depth
-        depth = self._get_liquidity_depth()
-        pressure = abs(current_delta) / (depth + 1e-9)
+        depth = self._get_liquidity_depth(5)
+        pressure = abs(delta) / (depth + 1e-9)
 
-        impact = self._calculate_impact(current_delta, price_change, volatility, pressure)
+        impact = self._calculate_impact(delta, price_change, volatility, pressure)
 
         # Update internal state
         self._current_state = FlowState(
-            delta=current_delta,
+            delta=delta,
             price_change=price_change,
             volatility=volatility,
             pressure=pressure,
             impact=impact
         )
 
-        self.impact_history.append(impact)
+        self._impact_history.append(impact)
 
     def calculate_absorption(self, side: str) -> float:
         """
@@ -117,10 +116,10 @@ class OrderFlowEngine:
         if side == "sell" and state.delta >= 0: return 0.0
 
         impact = state.impact
-        if len(self.impact_history) < 100: return 0.0
+        if len(self._impact_history) < 100: return 0.0
 
-        avg = np.mean(self.impact_history)
-        std = np.std(self.impact_history) + 1e-9
+        avg = np.mean(self._impact_history)
+        std = np.std(self._impact_history) + 1e-9
 
         zscore = (impact - avg) / std
         # Low impact relative to high aggression = absorption

@@ -11,9 +11,8 @@ class OrderBookEngine:
     Integrates depth analysis to identify imbalance, pressure, and liquidity walls.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, config_manager: ConfigManager):
+    def __init__(self, market_state: MarketState, config_manager: ConfigManager):
         self.market_state = market_state
-        self.symbol = symbol
         self.config = config_manager
 
     # =====================================================

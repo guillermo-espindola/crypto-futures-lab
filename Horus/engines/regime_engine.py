@@ -16,12 +16,10 @@ class RegimeEngine:
 
     def __init__(self,
                  market_state: MarketState,
-                 symbol: str,
                  timeframe: str,
                  config_manager: ConfigManager,
                  logger: ILogger):
         self.market_state = market_state
-        self.symbol = symbol
         self.timeframe = timeframe
         self.config = config_manager
         self.logger = logger
@@ -134,11 +132,11 @@ class RegimeEngine:
         return self._current_results.get("efficiency", 0.0)
 
     def _ensure_computed(self):
-        snapshot = self.market_state.get_candle_snapshot(self.symbol, self.timeframe)
+        snapshot = self.market_state.get_candle_snapshot(self.timeframe)
         if not snapshot:
             return
 
-        df = self.market_state.get_candles_df(self.symbol, self.timeframe)
+        df = self.market_state.get_timeframe_candles_df(self.timeframe)
         if df.empty:
             return
 

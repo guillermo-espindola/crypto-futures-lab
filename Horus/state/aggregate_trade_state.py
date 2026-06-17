@@ -1,38 +1,18 @@
 from collections import deque
-from typing import Dict, List
+from typing import List
 
 from models.aggregate_trade import AggregateTrade
 
 
 class AggregateTradeState:
 
-    def __init__(self, maxlen):
+    def __init__(self, max_aggregate_trades):
 
-        self._maxlen = maxlen
-        self._data: Dict[str, deque] = {}
+        self._max_aggregate_trades = max_aggregate_trades
+        self._aggregate_trades = deque(maxlen=max_aggregate_trades)
 
     def add(self, aggregate_trade: AggregateTrade):
+        self._aggregate_trades.append(aggregate_trade)
 
-        symbol = aggregate_trade.symbol
-
-        if symbol not in self._data:
-
-            self._data[symbol] = deque(
-                maxlen=self._maxlen
-            )
-
-        self._data[symbol].append(aggregate_trade)
-
-    def get(self, symbol) -> List[AggregateTrade]:
-
-        return list(
-            self._data.get(symbol, [])
-        )
-
-    def last(self, symbol):
-
-        aggregate_trades = self.get(symbol)
-        if not aggregate_trades:
-            return None
-
-        return aggregate_trades[-1]
+    def get(self) -> List[AggregateTrade]:
+        return list(self._aggregate_trades)

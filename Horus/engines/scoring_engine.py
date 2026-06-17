@@ -26,13 +26,13 @@ class ScoringEngine:
                  order_book_engine: OrderBookEngine,
                  config_manager: ConfigManager,
                  logger: Logger):
-        self.structure = structure_engine
-        self.liquidity = liquidity_engine
-        self.order_flow = order_flow_engine
-        self.regime = regime_engine
-        self.order_book = order_book_engine
-        self.logger = logger
-        self.config = config_manager
+        self._structure_engine = structure_engine
+        self._liquidity_engine = liquidity_engine
+        self._order_flow_engine = order_flow_engine
+        self._regime_engine = regime_engine
+        self._order_book_engine = order_book_engine
+        self._logger = logger
+        self._config_manager = config_manager
 
     def _sigmoid(self, x: float) -> float:
         # Numerical stability for sigmoid
@@ -56,20 +56,20 @@ class ScoringEngine:
         Single-pass computation of both long and short scores to avoid redundancy.
         """
         # 1. Get context from RegimeEngine (which uses the cached CandleSnapshot)
-        atr = self.regime.get_atr()
-        regime_val = self.regime.regime_score()
+        atr = self._regime_engine.get_atr()
+        regime_val = self._regime_engine.regime_score()
 
         # 2. Weights from config (driven by the active mode)
-        w_struct = self.config.get_config().scoring.long_bias_weight
-        w_flow = self.config.get_config().scoring.long_bias_weight
-        w_regime = self.config.get_config().scoring.regime_weight
-        w_book = self.config.get_config().scoring.book_weight
+        w_struct = self._config_manager.get_config().scoring.long_bias_weight
+        w_flow = self._config_manager.get_config().scoring.long_bias_weight
+        w_regime = self._config_manager.get_config().scoring.regime_weight
+        w_book = self._config_manager.get_config().scoring.book_weight
 
         # 3. Long Components
-        struct_long = self.structure.bos_up(atr)
-        liq_long = self.liquidity.sweep_low(atr)
-        flow_long = self.order_flow.get_absorption_buy()
-        book_long = self.order_book.calculate_imbalance() # [-1, 1]
+        struct_long = self._structure_engine.bos_up(atr)
+        liq_long = self._liquidity_engine.sweep_low(atr)
+        flow_long = self._order_flow_engine.get_absorption_buy()
+        book_long = self._order_book_engine.calculate_imbalance() # [-1, 1]
 
         # Convert book imbalance [-1, 1] to [0, 1] for the weighted sum
         book_long_norm = (book_long + 1.0) / 2.0
@@ -78,10 +78,10 @@ class ScoringEngine:
         bias_long = (0.7 * struct_long) + (0.3 * liq_long)
 
         # 4. Short Components
-        struct_short = self.structure.bos_down(atr)
-        liq_short = self.liquidity.sweep_high(atr)
-        flow_short = self.order_flow.get_absorption_sell()
-        book_short = -self.order_book.calculate_imbalance() # Inverse of long imbalance
+        struct_short = self._structure_engine.bos_down(atr)
+        liq_short = self._liquidity_engine.sweep_high(atr)
+        flow_short = self._order_flow_engine.get_absorption_sell()
+        book_short = -self._order_book_engine.calculate_imbalance() # Inverse of long imbalance
 
         book_short_norm = (book_short + 1.0) / 2.0
 
@@ -97,9 +97,9 @@ class ScoringEngine:
         final_long = self._calibrate(raw_long, regime_val)
         final_short = self._calibrate(raw_short, regime_val)
 
-        self.logger.info(f"[SCORING] Regime: {regime_val:.2f}, OB_Imbalance: {book_long:.2f}")
-        self.logger.info(f"[SCORING] Long: {final_long:.4f} (raw:{raw_long:.2f})")
-        self.logger.info(f"[SCORING] Short: {final_short:.4f} (raw:{raw_short:.2f})")
+        self._logger.info(f"[SCORING] Regime: {regime_val:.2f}, OB_Imbalance: {book_long:.2f}")
+        self._logger.info(f"[SCORING] Long: {final_long:.4f} (raw:{raw_long:.2f})")
+        self._logger.info(f"[SCORING] Short: {final_short:.4f} (raw:{raw_short:.2f})")
 
         return float(np.clip(final_long, 0.0, 1.0)), float(np.clip(final_short, 0.0, 1.0))
 

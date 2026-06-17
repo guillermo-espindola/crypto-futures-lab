@@ -11,9 +11,8 @@ class LiquidityEngine:
     Now normalized by ATR for consistent signal strength across assets/volatility.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, timeframe: str, config_manager: ConfigManager):
+    def __init__(self, market_state: MarketState, timeframe: str, config_manager: ConfigManager):
         self.market_state = market_state
-        self.symbol = symbol
         self.timeframe = timeframe
         self.config = config_manager
 
@@ -26,10 +25,10 @@ class LiquidityEngine:
         Bullish liquidity grab.
         Normalized by ATR: strength = (min_low - current_low) / ATR
         """
-        snapshot = self.market_state.get_candle_snapshot(self.symbol, self.timeframe)
+        snapshot = self.market_state.get_candle_snapshot(self.timeframe)
         if not snapshot: return 0.0
 
-        df = self.market_state.get_candles_df(self.symbol, self.timeframe)
+        df = self.market_state.get_timeframe_candles_df(self.timeframe)
         if df.empty: return 0.0
 
         lookback = self.config.get_config().liquidity.lookback_period
@@ -53,10 +52,10 @@ class LiquidityEngine:
         Bearish liquidity grab.
         Normalized by ATR: strength = (current_high - max_high) / ATR
         """
-        snapshot = self.market_state.get_candle_snapshot(self.symbol, self.timeframe)
+        snapshot = self.market_state.get_candle_snapshot(self.timeframe)
         if not snapshot: return 0.0
 
-        df = self.market_state.get_candles_df(self.symbol, self.timeframe)
+        df = self.market_state.get_timeframe_candles_df(self.timeframe)
         if df.empty: return 0.0
 
         lookback = self.config.get_config().liquidity.lookback_period

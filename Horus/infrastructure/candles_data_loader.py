@@ -11,12 +11,12 @@ from utils.logger_interface import ILogger
 class CandlesDataLoader(ILoader):
     def __init__(self, symbol: str,
                  time_frames: list[str],
-                 max_length: int,
+                 max_candles: int,
                  candles_state: CandlesState,
                  logger: ILogger):
         self._symbol = symbol
         self._time_frames = time_frames
-        self._max_length = max_length,
+        self._max_candles = max_candles,
         self._candles_state = candles_state
         self._url = 'https://www.binance.com/fapi/v1/klines'
         self._logger = logger
@@ -89,7 +89,7 @@ class CandlesDataLoader(ILoader):
 
             candlesResult = self._fetch_candles(self._symbol,
                                                 time_frame, 
-                                                self._max_length, 
+                                                self._max_candles, 
                                                 current_timestamp)
             for candleResult in candlesResult:
 

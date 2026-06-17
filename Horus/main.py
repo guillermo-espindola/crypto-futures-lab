@@ -62,8 +62,7 @@ async def main():
 
     aggregate_trade_candle_builder = AggregateTradeCandleBuilder(10, candles_state, Logger(AggregateTradeCandleBuilder, logger_settings_console))
 
-    market_state = MarketState(symbol,
-                               candles_state,
+    market_state = MarketState(candles_state,
                                order_book_state,
                                aggregate_trade_state,
                                liquidation_state,
@@ -86,11 +85,11 @@ async def main():
                                    Logger(KafkaConsumer, logger_settings_console))
 
     # 4. ENGINES (Hierarchical dependency)
-    regime_engine = RegimeEngine(market_state, symbol, time_frame, config_manager, Logger(RegimeEngine, logger_settings_console))
-    structure_engine = StructureEngine(market_state, symbol, time_frame, config_manager, Logger(StructureEngine, logger_settings_console))
-    liquidity_engine = LiquidityEngine(market_state, symbol, time_frame, config_manager)
-    order_flow_engine = OrderFlowEngine(market_state, symbol, window_size, Logger(OrderFlowEngine, logger_settings_console))
-    order_book_engine = OrderBookEngine(market_state, symbol, config_manager)
+    regime_engine = RegimeEngine(market_state, time_frame, config_manager, Logger(RegimeEngine, logger_settings_console))
+    structure_engine = StructureEngine(market_state, time_frame, config_manager, Logger(StructureEngine, logger_settings_console))
+    liquidity_engine = LiquidityEngine(market_state, time_frame, config_manager)
+    order_flow_engine = OrderFlowEngine(market_state, window_size, Logger(OrderFlowEngine, logger_settings_console))
+    order_book_engine = OrderBookEngine(market_state, config_manager)
 
     scoring_engine = ScoringEngine(
         structure_engine,
@@ -117,7 +116,6 @@ async def main():
 
     # 6. TRADING LOOP
     trading_loop = TradingLoop(
-        symbol,
         market_state,
         kafka_consumer,
         structure_engine,
