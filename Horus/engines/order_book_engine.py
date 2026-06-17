@@ -24,8 +24,8 @@ class OrderBookEngine:
         """
         Calculates the current bid-ask spread.
         """
-        bids = self.market_state.get_sorted_bids(self.symbol, 1)
-        asks = self.market_state.get_sorted_asks(self.symbol, 1)
+        bids = self.market_state.get_sorted_bids(1)
+        asks = self.market_state.get_sorted_asks(1)
 
         if not bids or not asks:
             return 0.0
@@ -40,8 +40,8 @@ class OrderBookEngine:
         Symmetry: (BidVol - AskVol) / (BidVol + AskVol)
         Range: [-1.0, 1.0]
         """
-        bids = self.market_state.get_sorted_bids(self.symbol, depth)
-        asks = self.market_state.get_sorted_asks(self.symbol, depth)
+        bids = self.market_state.get_sorted_bids(depth)
+        asks = self.market_state.get_sorted_asks(depth)
 
         if not bids or not asks:
             return 0.0
@@ -56,8 +56,8 @@ class OrderBookEngine:
         """
         Calculates weighted imbalance where closer levels have more weight.
         """
-        bids = self.market_state.get_sorted_bids(self.symbol, depth)
-        asks = self.market_state.get_sorted_asks(self.symbol, depth)
+        bids = self.market_state.get_sorted_bids(depth)
+        asks = self.market_state.get_sorted_asks(depth)
 
         if not bids or not asks:
             return 0.0
@@ -76,8 +76,8 @@ class OrderBookEngine:
         Calculates the microprice, a leading indicator of the next mid-price move.
         Microprice = (BestBid * AskVol + BestAsk * BidVol) / (BidVol + AskVol)
         """
-        bids = self.market_state.get_sorted_bids(self.symbol, 1)
-        asks = self.market_state.get_sorted_asks(self.symbol, 1)
+        bids = self.market_state.get_sorted_bids(1)
+        asks = self.market_state.get_sorted_asks(1)
 
         if not bids or not asks:
             return 0.0
@@ -93,8 +93,8 @@ class OrderBookEngine:
         Identifies price levels with volume significantly higher than the average depth.
         Returns a dict with "bids" and "asks" walls.
         """
-        bids = self.market_state.get_sorted_bids(self.symbol, depth)
-        asks = self.market_state.get_sorted_asks(self.symbol, depth)
+        bids = self.market_state.get_sorted_bids(depth)
+        asks = self.market_state.get_sorted_asks(depth)
 
         if not bids or not asks:
             return {"bids": [], "asks": []}

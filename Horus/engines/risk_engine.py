@@ -63,7 +63,7 @@ class RiskEngine:
         if self.peak_equity > 0:
             dd = (self.peak_equity - equity) / self.peak_equity
             if dd >= max_dd:
-                self.logger.warn(f"Drawdown Limit Hit: {dd:.2%}")
+                self.logger.error(f"Drawdown Limit Hit: {dd:.2%}")
                 return False
 
         # 2. Exposure Limit

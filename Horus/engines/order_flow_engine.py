@@ -4,10 +4,8 @@ from typing import List
 from dataclasses import dataclass
 
 from state.market_state import MarketState
-from config.config_manager import ConfigManager
 from utils.logger_interface import ILogger
 from models.trade import Trade
-
 
 @dataclass
 class FlowState:
@@ -26,11 +24,11 @@ class OrderFlowEngine:
     Integrates Order Book depth to calculate real liquidity pressure.
     """
 
-    def __init__(self, market_state: MarketState, symbol: str, config_manager: ConfigManager, logger: ILogger):
-        self.market_state = market_state
-        self.symbol = symbol
-        self.config = config_manager
-        self.logger = logger
+    def __init__(self, market_state: MarketState, symbol: str, window_size: int, logger: ILogger):
+        self._market_state = market_state
+        self._symbol = symbol
+        self._window_size = window_size
+        self._logger = logger
 
         # Rolling history of impact values
         self.impact_history = deque(maxlen=2000)
@@ -42,22 +40,26 @@ class OrderFlowEngine:
 
     def _get_liquidity_depth(self) -> float:
         """Returns the sum of volumes in top 5 levels of the orderbook."""
-        ob = self.market_state.get_orderbook(self.symbol)
-        if not ob:
+        order_book = self._market_state.get_orderbook()
+        if not order_book:
             return 0.0
-        bid_vol = sum([float(b[1]) for b in ob.bids[:5]])
-        ask_vol = sum([float(a[1]) for a in ob.asks[:5]])
+        
+        sorted_bids = self._market_state.get_sorted_bids(5)
+        sorted_asks = self._market_state.get_sorted_asks(5)
+
+        bid_vol = sum([bid[1] for bid in sorted_bids])
+        ask_vol = sum([ask[1] for ask in sorted_asks])
+
         return bid_vol + ask_vol
 
     def _calculate_delta(self, trades: List[Trade]) -> float:
         buys = 0.0
         sells = 0.0
         for trade in trades:
-            q = float(trade.quantity)
             if trade.is_buyer_maker: # Aggressive Sell
-                sells += q
+                sells += trade.quantity
             else: # Aggressive Buy
-                buys += q
+                buys += trade.quantity
         return buys - sells
 
     def _calculate_impact(self, delta: float, price_change: float, volatility: float, pressure: float) -> float:
@@ -75,27 +77,26 @@ class OrderFlowEngine:
         """
         Calculates current tick-level state and updates the impact history.
         """
-        trades = self.market_state.get_trades(self.symbol)
-        if len(trades) < 50: return
+        current_trades = self._market_state.get_current_trades()
+        if len(current_trades) < self._window_size: return
 
-        window = self.config.get_config().order_flow.window_size
-        recent = trades[-window:]
+        recent_trades = current_trades[-(self._window_size):]
 
-        delta = self._calculate_delta(recent)
-        price_change = float(recent[-1].price) - float(recent[0].price)
+        current_delta = self._calculate_delta(recent_trades)
+        price_change = recent_trades[-1].price - recent_trades[0].price
 
-        prices = np.array([float(t.price) for t in recent])
-        volatility = np.std(np.diff(prices) / prices[:-1]) + 1e-9
+        np_prices = np.array([recent_trade.price for recent_trade in recent_trades])
+        volatility = np.std(np.diff(np_prices) / np_prices[:-1]) + 1e-9
 
         # New Liquidity Pressure: Delta / Total Depth
         depth = self._get_liquidity_depth()
-        pressure = abs(delta) / (depth + 1e-9)
+        pressure = abs(current_delta) / (depth + 1e-9)
 
-        impact = self._calculate_impact(delta, price_change, volatility, pressure)
+        impact = self._calculate_impact(current_delta, price_change, volatility, pressure)
 
         # Update internal state
         self._current_state = FlowState(
-            delta=delta,
+            delta=current_delta,
             price_change=price_change,
             volatility=volatility,
             pressure=pressure,

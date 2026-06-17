@@ -47,13 +47,14 @@ async def main():
     max_liquidations = app_config.market.max_liquidations
     max_trades = app_config.market.max_trades
     initial_balance = app_config.portfolio.initial_balance
+    window_size = app_config.order_flow.window_size
 
     kafka_topics = app_config.kafka.topics
     kafka_bootstrap_server = app_config.kafka.bootstrap_server
     kafka_group_id = app_config.kafka.group_id
 
     candles_state = CandlesState(max_candles,
-                                 Logger(CandlesState, logger_settings_file))
+                                 Logger(CandlesState, logger_settings_console))
     order_book_state = OrderBookState(Logger(OrderBookState, logger_settings_console))
     aggregate_trade_state = AggregateTradeState(max_agg_trades)
     liquidation_state = LiquidationState(max_liquidations)
@@ -88,7 +89,7 @@ async def main():
     regime_engine = RegimeEngine(market_state, symbol, time_frame, config_manager, Logger(RegimeEngine, logger_settings_console))
     structure_engine = StructureEngine(market_state, symbol, time_frame, config_manager, Logger(StructureEngine, logger_settings_console))
     liquidity_engine = LiquidityEngine(market_state, symbol, time_frame, config_manager)
-    order_flow_engine = OrderFlowEngine(market_state, symbol, config_manager, Logger(OrderFlowEngine, logger_settings_console))
+    order_flow_engine = OrderFlowEngine(market_state, symbol, window_size, Logger(OrderFlowEngine, logger_settings_console))
     order_book_engine = OrderBookEngine(market_state, symbol, config_manager)
 
     scoring_engine = ScoringEngine(

@@ -6,7 +6,7 @@
     "max_candles": 250,
     "max_agg_trades": 1000,
     "max_liquidations": 100,
-    "max_trades": 1000
+    "max_trades": 100
   },
 
   "portfolio": {

@@ -1,14 +1,14 @@
 import pandas as pd
 import numpy as np
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 
 from models.aggregate_trade import AggregateTrade
 from models.candle import Candle
 from models.candle_snapshot import CandleSnapshot
 from models.liquidation import Liquidation
 from models.market_snapshot import MarketSnapshot
+from models.orderbook_depth_update import OrderBookDepthUpdate
 from models.orderbook import OrderBook
-from models.orderbook_snapshot import OrderBookSnapshot
 from models.trade import Trade
 
 from state.aggregate_trade_state import AggregateTradeState
@@ -146,29 +146,26 @@ class MarketState:
     def add_trade(self, trade: Trade):
         self._trade_state.add(trade)
 
-    def get_trades(self, symbol: str) -> List[Trade]:
-        return self._trade_state.get(symbol)
-
-    def last_trade(self, symbol: str) -> Optional[Trade]:
-        return self._trade_state.last(symbol)
+    def get_current_trades(self) -> List[Trade]:
+        return self._trade_state.get_current_trades()
 
     # =====================================================
-    # ORDERBOOKS
+    # ORDERBOOK
     # =====================================================
 
-    def add_orderbook(self, ob: OrderBook):
-        self._orderbook_state.update(ob)
+    def update_orderbook(self, orderbook_depth_update: OrderBookDepthUpdate):
+        self._orderbook_state.update(orderbook_depth_update)
 
-    def get_orderbook(self, symbol: str) -> Optional[OrderBookSnapshot]:
-        return self._orderbook_state.get(symbol)
+    def get_orderbook(self) -> Optional[OrderBook]:
+        return self._orderbook_state.get_orderbook()
 
-    def get_sorted_bids(self, symbol: str, limit: int = 20) -> List[Tuple[float, float]]:
+    def get_sorted_bids(self, limit: int = 20) -> List[Tuple[float, float]]:
         """Returns top N bids from the local book."""
-        return self._orderbook_state.get_sorted_bids(symbol, limit)
+        return self._orderbook_state.get_sorted_bids(limit)
 
-    def get_sorted_asks(self, symbol: str, limit: int = 20) -> List[Tuple[float, float]]:
+    def get_sorted_asks(self, limit: int = 20) -> List[Tuple[float, float]]:
         """Returns top N asks from the local book."""
-        return self._orderbook_state.get_sorted_asks(symbol, limit)
+        return self._orderbook_state.get_sorted_asks(limit)
 
     # =====================================================
     # LIQUIDATIONS
@@ -194,8 +191,8 @@ class MarketState:
         return MarketSnapshot(
             symbol=symbol,
             candles_df=self.get_candles_df(symbol, timeframe),
-            trades=self.get_trades(symbol),
-            orderbook=self.get_orderbook(symbol),
+            trades=self.get_current_trades(symbol),
+            orderbook=self.get_orderbook(),
             liquidations=self.get_liquidations(symbol),
             timestamp=timestamp
         )

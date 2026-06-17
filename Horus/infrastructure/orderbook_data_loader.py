@@ -1,7 +1,7 @@
 import requests
 
 from infrastructure.loader_interface import ILoader
-from models.orderbook_snapshot import OrderBookSnapshot
+from models.orderbook import OrderBook
 from state.orderbook_state import OrderBookState
 from utils.logger_interface import ILogger
 
@@ -25,8 +25,9 @@ class OrderBookDataLoader(ILoader):
             response.raise_for_status()
             data = response.json()
 
-            order_book_snapshot = OrderBookSnapshot.from_json(data)
-            self._orderbook_state.apply_snapshot(self._symbol, order_book_snapshot)
+            order_book = OrderBook.from_json(data)
+            self._logger.info(f"[LOAD ORDERBOOK]{order_book}")
+            self._orderbook_state.set_orderbook(order_book)
 
         except Exception as e:
             self._logger.error(f"[FETCHING ORDERBOOK] {e}")
