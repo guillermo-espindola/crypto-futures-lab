@@ -43,11 +43,15 @@ async def main():
     time_frame = app_config.market.timeframe
     time_frames = app_config.market.timeframes
     max_candles = app_config.market.max_candles
+    max_orderbook_depth = app_config.market.max_orderbook_depth
     max_agg_trades = app_config.market.max_agg_trades
     max_liquidations = app_config.market.max_liquidations
     max_trades = app_config.market.max_trades
     initial_balance = app_config.portfolio.initial_balance
     window_size = app_config.order_flow.window_size
+
+    history_candles_endpoint = app_config.history.candles_endpoint
+    history_orderbook_endpoint = app_config.history.orderbook_depth_endpoint
 
     kafka_topics = app_config.kafka.topics
     kafka_bootstrap_server = app_config.kafka.bootstrap_server
@@ -70,12 +74,13 @@ async def main():
                                aggregate_trade_candle_builder)
 
     # 3. LOADER & CONSUMER
-    candles_data_loader = CandlesDataLoader(symbol,
+    candles_data_loader = CandlesDataLoader(history_candles_endpoint,
+                                            symbol,
                                             time_frames,
                                             max_candles,
                                             candles_state,
-                                            Logger(CandlesDataLoader, logger_settings_console))
-    orderbook_data_loader = OrderBookDataLoader(symbol, 100, order_book_state, Logger(OrderBookDataLoader, logger_settings_console))
+                                            Logger(CandlesDataLoader, logger_settings_file))
+    orderbook_data_loader = OrderBookDataLoader(history_orderbook_endpoint, symbol, max_orderbook_depth, order_book_state, Logger(OrderBookDataLoader, logger_settings_file))
     event_dispatcher = EventDispatcher(market_state,
                                        Logger(EventDispatcher, logger_settings_console))
     kafka_consumer = KafkaConsumer( kafka_topics, 
@@ -133,7 +138,7 @@ async def main():
     )
 
     try:
-        notifier.notify("*** HORUS ***")
+        notifier.notify("[HORUS]")
         candles_data_loader.load()
         orderbook_data_loader.load()
         candles_state.new_candle_event.subscribe(trading_loop.on_new_candle)

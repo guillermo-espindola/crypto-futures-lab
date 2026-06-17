@@ -10,3 +10,4 @@ class MarketConfig:
     max_agg_trades: int
     max_liquidations: int
     max_trades:int
+    max_orderbook_depth: int    

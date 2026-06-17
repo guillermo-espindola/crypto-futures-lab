@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from config.behavior_config import BehaviorConfig
 from config.execution_config import ExecutionConfig
+from config.history_config import HistoryConfig
 from config.kafka_config import KafkaConfig
 from config.liquidity_config import LiquidityConfig
 from config.logger_config import LoggerConfig
@@ -17,6 +18,7 @@ from config.telegram_config import TelegramConfig
 @dataclass(frozen=True)
 class AppConfig:
     market: MarketConfig
+    history: HistoryConfig
     portfolio: PortfolioConfig
     risk: RiskConfig
     regime: RegimeConfig

@@ -7,12 +7,12 @@ from utils.logger_interface import ILogger
 
 class OrderBookDataLoader(ILoader):
 
-    def __init__(self, symbol: str, limit: int, orderbook_state: OrderBookState, logger: ILogger):
+    def __init__(self, url: str, symbol: str, limit: int, orderbook_state: OrderBookState, logger: ILogger):
         self._symbol = symbol
         self._limit = limit
         self._orderbook_state = orderbook_state
         self._logger = logger
-        self._url = "https://fapi.binance.com/fapi/v1/depth"
+        self._url = url
 
     def load(self):
 
