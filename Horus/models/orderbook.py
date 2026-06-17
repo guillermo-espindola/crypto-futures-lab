@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
 
 @dataclass(frozen=True)
 class OrderBook:
@@ -14,8 +13,8 @@ class OrderBook:
     
     asks: dict[float, float]
 
-    @classmethod
-    def from_json(self, data: dict) -> 'OrderBook':
+    @staticmethod
+    def from_json(data: dict) -> OrderBook:
 
         bids: dict[float, float] = {}
         asks: dict[float, float] = {}
@@ -24,11 +23,13 @@ class OrderBook:
         
         for price, quantity in data["asks"]:
             asks[float(price)] = float(quantity)
-
-        return self(
+        
+        orderbook = OrderBook(
             last_update_id=int(data["lastUpdateId"]),
             event_time=int(data["E"]),
             transaction_time=int(data["T"]),
             bids=bids,
             asks=asks,
         )
+
+        return orderbook

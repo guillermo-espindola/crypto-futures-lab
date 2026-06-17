@@ -79,8 +79,8 @@ async def main():
                                             time_frames,
                                             max_candles,
                                             candles_state,
-                                            Logger(CandlesDataLoader, logger_settings_file))
-    orderbook_data_loader = OrderBookDataLoader(history_orderbook_endpoint, symbol, max_orderbook_depth, order_book_state, Logger(OrderBookDataLoader, logger_settings_file))
+                                            Logger(CandlesDataLoader, logger_settings_console))
+    orderbook_data_loader = OrderBookDataLoader(history_orderbook_endpoint, symbol, max_orderbook_depth, order_book_state, Logger(OrderBookDataLoader, logger_settings_console))
     event_dispatcher = EventDispatcher(market_state,
                                        Logger(EventDispatcher, logger_settings_console))
     kafka_consumer = KafkaConsumer( kafka_topics, 
