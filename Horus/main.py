@@ -14,6 +14,7 @@ from engines.risk_engine import RiskEngine
 from engines.scoring_engine import ScoringEngine
 from engines.structure_engine import StructureEngine
 
+from infrastructure.aggregate_trades_data_loader import AggregateTradesDataLoader
 from infrastructure.candles_data_loader import CandlesDataLoader
 from infrastructure.event_dispatcher import EventDispatcher
 from infrastructure.kafka_consumer import KafkaConsumer
@@ -52,13 +53,14 @@ async def main():
 
     history_candles_endpoint = app_config.history.candles_endpoint
     history_orderbook_endpoint = app_config.history.orderbook_depth_endpoint
+    history_aggregate_trades_endpoint = app_config.history.aggregate_trades_endpoint
 
     kafka_topics = app_config.kafka.topics
     kafka_bootstrap_server = app_config.kafka.bootstrap_server
     kafka_group_id = app_config.kafka.group_id
 
     candles_state = CandlesState(max_candles,
-                                 Logger(CandlesState, logger_settings_console))
+                                 Logger(CandlesState, logger_settings_file))
     order_book_state = OrderBookState(Logger(OrderBookState, logger_settings_console))
     aggregate_trade_state = AggregateTradeState(max_agg_trades)
     liquidation_state = LiquidationState(max_liquidations)
@@ -74,6 +76,9 @@ async def main():
                                aggregate_trade_candle_builder)
 
     # 3. LOADER & CONSUMER
+
+    aggregate_trades_data_loader = AggregateTradesDataLoader(history_aggregate_trades_endpoint, symbol, max_agg_trades, market_state, Logger(AggregateTradesDataLoader, logger_settings_file))
+
     candles_data_loader = CandlesDataLoader(history_candles_endpoint,
                                             symbol,
                                             time_frames,
@@ -139,6 +144,7 @@ async def main():
 
     try:
         notifier.notify("[HORUS]")
+        aggregate_trades_data_loader.load()
         candles_data_loader.load()
         orderbook_data_loader.load()
         candles_state.new_candle_event.subscribe(trading_loop.on_new_candle)

@@ -10,9 +10,9 @@
     "max_orderbook_depth": 100
   },
   "history": {
-    "candles_endpoint": "https://www.binance.com/fapi/v1/klines",
-    "orderbook_depth_endpoint": "https://fapi.binance.com/fapi/v1/depth"
-
+    "candles_endpoint": "https://fapi.binance.com/fapi/v1/klines",
+    "orderbook_depth_endpoint": "https://fapi.binance.com/fapi/v1/depth",
+    "aggregate_trades_endpoint": "https://fapi.binance.com/fapi/v1/aggTrades"
   },
 
   "portfolio": {
