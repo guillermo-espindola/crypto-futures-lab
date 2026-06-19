@@ -2,10 +2,10 @@
   "market": {
     "symbol": "VELVETUSDT",
     "timeframe": "5s",
-    "timeframes": ["1m"],
-    "timeframe_seconds": 10,    
-    "heartbeat_seconds": 10,
-    "max_candles": 250,
+    "timeframes": [],
+    "timeframe_seconds": 5,    
+    "heartbeat_seconds": 5,
+    "max_candles": 500,
     "max_agg_trades": 1000,
     "max_liquidations": 100,
     "max_trades": 100,
@@ -33,7 +33,7 @@
   },
 
   "structure":{
-    "swing_window": 5
+    "swing_window": 10
   },
 
   "scoring": {
