@@ -15,31 +15,31 @@ class AggregateTradeCandleBuilder:
         candles_state: CandlesState,
         logger: ILogger
     ):
-        self._tf_ms = timeframe_seconds * 1000
+        self._timeframe_milliseconds = timeframe_seconds * 1000
         self._candles_state = candles_state
         self._logger = logger
         self._buckets: Dict[str, Dict[int, dict]] = defaultdict(dict)
 
-    def add(self, trade: AggregateTrade):
+    def add(self, aggregate_trade: AggregateTrade):
 
-        symbol = trade.symbol
-        ts = trade.trade_time
+        symbol = aggregate_trade.symbol
+        ts = aggregate_trade.trade_time
 
         bucket_start = self._bucket_start(ts)
         buckets = self._buckets[symbol]
 
         if bucket_start not in buckets:
-            buckets[bucket_start] = self._init_bucket(trade, bucket_start)
+            buckets[bucket_start] = self._init_bucket(aggregate_trade, bucket_start)
 
-        self._update_bucket(buckets[bucket_start], trade)
+        self._update_bucket(buckets[bucket_start], aggregate_trade)
 
         self._flush(symbol, ts)
 
     def _bucket_start(self, ts: int) -> int:
-        return (ts // self._tf_ms) * self._tf_ms
+        return (ts // self._timeframe_milliseconds) * self._timeframe_milliseconds
 
     def _bucket_end(self, start: int) -> int:
-        return start + self._tf_ms
+        return start + self._timeframe_milliseconds
 
     def _flush(self, symbol: str, current_ts: int):
 
@@ -62,20 +62,20 @@ class AggregateTradeCandleBuilder:
 
         return {
             "open_time": start,
-            "close_time": start + self._tf_ms,
+            "close_time": start + self._timeframe_milliseconds,
 
             "open": trade.price,
             "high": trade.price,
             "low": trade.price,
             "close": trade.price,
 
-            "volume": trade.quantity,
-            "quote_volume": trade.price * trade.quantity,
+            "volume": 0.0,
+            "quote_volume": 0.0,
 
-            "trades": 1,
+            "trades": 0,
 
-            "taker_buy_base_volume": trade.quantity if not trade.is_buyer_maker else 0.0,
-            "taker_buy_quote_volume": trade.price * trade.quantity if not trade.is_buyer_maker else 0.0,
+            "taker_buy_base_volume": 0.0,
+            "taker_buy_quote_volume": 0.0,
         }
 
     def _update_bucket(self, bucket: dict, trade: AggregateTrade):
@@ -100,7 +100,7 @@ class AggregateTradeCandleBuilder:
 
         return Candle(
             symbol=symbol,
-            timeframe=f"{self._tf_ms // 1000}s",
+            timeframe=f"{self._timeframe_milliseconds // 1000}s",
 
             open_time=b["open_time"],
             close_time=b["close_time"],
