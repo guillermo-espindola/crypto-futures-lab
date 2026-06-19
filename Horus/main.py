@@ -1,5 +1,6 @@
 import asyncio
 
+from app.heartbeat import Heartbeat
 from app.trading_loop import TradingLoop
 
 from config.config_manager import ConfigManager
@@ -125,6 +126,8 @@ async def main():
     notifier = ToastNotifier(Logger(ToastNotifier, logger_settings_file))
 
     # 6. TRADING LOOP
+    heartbeat = Heartbeat(5)
+
     trading_loop = TradingLoop(
         market_state,
         kafka_consumer,
@@ -144,18 +147,22 @@ async def main():
 
     try:
         notifier.notify("[HORUS]")
-        aggregate_trades_data_loader.load()
         candles_data_loader.load()
         orderbook_data_loader.load()
+        aggregate_trades_data_loader.load()
         candles_state.new_candle_event.subscribe(trading_loop.on_new_candle)
         portfolio_engine.open_position_event.subscribe(trading_loop.on_open_position)
-
+        heartbeat.beat_event.subscribe(market_state.update_state)
+        
         await kafka_consumer.start()
+        heartbeat.start()
         await trading_loop.run(sleep_time=0.5)
     except KeyboardInterrupt:
-        print("\nStopping trading loop...")
+        print(f"[EXIT][Main] Stopping Horus")
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"[ERROR][Main] {e}")
+    finally:
+        heartbeat.stop()
 
 if __name__ == "__main__":
     try:
@@ -163,4 +170,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"[FATAL ERROR][Main] {e}")

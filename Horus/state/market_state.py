@@ -40,8 +40,10 @@ class MarketState:
         self._last_candle_open_time: Dict[str, int] = {}
         self._snapshot_cache: Dict[str, CandleSnapshot] = {}
 
+    def update_state(self, timestamp: int):
+        pass
+    
     # CURRENT PRICE
-
     def set_current_price(self, current_price: float):
         self._current_price = current_price
     
