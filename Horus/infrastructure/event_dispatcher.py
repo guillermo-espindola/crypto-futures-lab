@@ -23,7 +23,6 @@ class EventDispatcher:
             elif event_type == "aggTrade":
                 aggregate_trade = AggregateTrade.from_json(event)
                 self._market_state.add_aggregate_trade(aggregate_trade)
-                self._market_state.add_custom_candle(aggregate_trade)
             
             elif event_type == "trade":
                 self._market_state.add_trade(Trade.from_json(event))

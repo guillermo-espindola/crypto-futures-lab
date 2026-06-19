@@ -30,7 +30,7 @@ class AggregateTradesDataLoader(ILoader):
             for aggTrade in data:
                 aggregate_trade_snapshot = AggregateTradeSnapshot.from_json(aggTrade)
                 self._logger.info(f"[LOAD DATA]{aggregate_trade_snapshot}")
-                self._market_state.add_custom_candle(AggregateTrade(
+                self._market_state.add_aggregate_trade(AggregateTrade(
                     aggregate_trade_id=aggregate_trade_snapshot.aggregate_trade_id,
                     event_time=aggregate_trade_snapshot.timestamp,
                     quantity=aggregate_trade_snapshot.quantity,

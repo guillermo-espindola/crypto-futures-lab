@@ -16,7 +16,7 @@ from state.orderbook_state import OrderBookState
 from state.liquidation_state import LiquidationState
 from state.trade_state import TradeState
 
-from utils.aggregate_trade_candle_builder import AggregateTradeCandleBuilder
+from utils.candle_aggregator import CandleAggregator
 
 class MarketState:
     def __init__(self,
@@ -25,13 +25,13 @@ class MarketState:
                  aggregate_trade_state: AggregateTradeState,
                  liquidation_state: LiquidationState,
                  trades_state: TradeState,
-                 aggregate_trade_candle_builder: AggregateTradeCandleBuilder):
+                 candle_aggregator: CandleAggregator):
         self._candles_state = candles_state
         self._orderbook_state = orderbook_state
         self._aggregate_trade_state = aggregate_trade_state
         self._liquidation_state = liquidation_state
         self._trade_state = trades_state
-        self._aggregate_trade_candle_builder = aggregate_trade_candle_builder
+        self._candle_aggregator = candle_aggregator
 
         self._current_price: float = 0.0
 
@@ -40,8 +40,8 @@ class MarketState:
         self._last_candle_open_time: Dict[str, int] = {}
         self._snapshot_cache: Dict[str, CandleSnapshot] = {}
 
-    def update_state(self, timestamp: int):
-        pass
+    def refresh(self, timestamp: int):
+        self._candle_aggregator.refresh(timestamp, self._current_price)
     
     # CURRENT PRICE
     def set_current_price(self, current_price: float):
@@ -61,11 +61,7 @@ class MarketState:
             self._timeframe_candles_df_cache.pop(candle.timeframe, None)
             self._snapshot_cache.pop(candle.timeframe, None)
             self._last_candle_open_time[candle.timeframe] = candle.open_time
-    
-    def add_custom_candle(self, aggregate_trade: AggregateTrade):
-        self._aggregate_trade_candle_builder.add(aggregate_trade)
-
-    
+        
     def get_timeframe_candles_df(self, timeframe: str) -> pd.DataFrame:
         """
         Returns a cached DataFrame of candles.
@@ -131,6 +127,7 @@ class MarketState:
 
     def add_aggregate_trade(self, aggregate_trade: AggregateTrade):
         self._aggregate_trade_state.add(aggregate_trade)
+        self._candle_aggregator.add(aggregate_trade)
 
     def get_aggregate_trades(self) -> List[AggregateTrade]:
         return self._aggregate_trade_state.get()

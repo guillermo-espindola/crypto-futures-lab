@@ -30,7 +30,7 @@ from state.aggregate_trade_state import AggregateTradeState
 from state.liquidation_state import LiquidationState
 from state.trade_state import TradeState
 
-from utils.aggregate_trade_candle_builder import AggregateTradeCandleBuilder
+from utils.candle_aggregator import CandleAggregator
 from utils.logger import Logger
 from utils.logger_settings import LoggerSettings
 
@@ -67,7 +67,7 @@ async def main():
     liquidation_state = LiquidationState(max_liquidations)
     trades_state = TradeState(max_trades)
 
-    aggregate_trade_candle_builder = AggregateTradeCandleBuilder(10, candles_state, Logger(AggregateTradeCandleBuilder, logger_settings_console))
+    aggregate_trade_candle_builder = CandleAggregator(10, candles_state, Logger(CandleAggregator, logger_settings_console))
 
     market_state = MarketState(candles_state,
                                order_book_state,
@@ -78,7 +78,7 @@ async def main():
 
     # 3. LOADER & CONSUMER
 
-    aggregate_trades_data_loader = AggregateTradesDataLoader(history_aggregate_trades_endpoint, symbol, max_agg_trades, market_state, Logger(AggregateTradesDataLoader, logger_settings_file))
+    aggregate_trades_data_loader = AggregateTradesDataLoader(history_aggregate_trades_endpoint, symbol, max_agg_trades, market_state, Logger(AggregateTradesDataLoader, logger_settings_console))
 
     candles_data_loader = CandlesDataLoader(history_candles_endpoint,
                                             symbol,
@@ -152,7 +152,7 @@ async def main():
         aggregate_trades_data_loader.load()
         candles_state.new_candle_event.subscribe(trading_loop.on_new_candle)
         portfolio_engine.open_position_event.subscribe(trading_loop.on_open_position)
-        heartbeat.beat_event.subscribe(market_state.update_state)
+        heartbeat.beat_event.subscribe(market_state.refresh)
         
         await kafka_consumer.start()
         heartbeat.start()
