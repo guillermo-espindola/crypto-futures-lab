@@ -42,8 +42,10 @@ async def main():
     app_config = config_manager.get_config()
 
     symbol = app_config.market.symbol
-    time_frame = app_config.market.timeframe
-    time_frames = app_config.market.timeframes
+    timeframe = app_config.market.timeframe
+    timeframes = app_config.market.timeframes
+    timeframe_seconds = app_config.market.timeframe_seconds
+    heartbeat_seconds = app_config.market.heartbeat_seconds
     max_candles = app_config.market.max_candles
     max_orderbook_depth = app_config.market.max_orderbook_depth
     max_agg_trades = app_config.market.max_agg_trades
@@ -67,14 +69,14 @@ async def main():
     liquidation_state = LiquidationState(max_liquidations)
     trades_state = TradeState(max_trades)
 
-    aggregate_trade_candle_builder = CandleAggregator(symbol, 10, candles_state, Logger(CandleAggregator, logger_settings_console))
+    candle_aggregator = CandleAggregator(symbol, timeframe_seconds, candles_state, Logger(CandleAggregator, logger_settings_console))
 
     market_state = MarketState(candles_state,
                                order_book_state,
                                aggregate_trade_state,
                                liquidation_state,
                                trades_state,
-                               aggregate_trade_candle_builder)
+                               candle_aggregator)
 
     # 3. LOADER & CONSUMER
 
@@ -82,7 +84,7 @@ async def main():
 
     candles_data_loader = CandlesDataLoader(history_candles_endpoint,
                                             symbol,
-                                            time_frames,
+                                            timeframes,
                                             max_candles,
                                             candles_state,
                                             Logger(CandlesDataLoader, logger_settings_console))
@@ -96,9 +98,9 @@ async def main():
                                    Logger(KafkaConsumer, logger_settings_console))
 
     # 4. ENGINES (Hierarchical dependency)
-    regime_engine = RegimeEngine(market_state, time_frame, config_manager, Logger(RegimeEngine, logger_settings_console))
-    structure_engine = StructureEngine(market_state, time_frame, config_manager, Logger(StructureEngine, logger_settings_console))
-    liquidity_engine = LiquidityEngine(market_state, time_frame, config_manager)
+    regime_engine = RegimeEngine(market_state, timeframe, config_manager, Logger(RegimeEngine, logger_settings_console))
+    structure_engine = StructureEngine(market_state, timeframe, config_manager, Logger(StructureEngine, logger_settings_console))
+    liquidity_engine = LiquidityEngine(market_state, timeframe, config_manager)
     order_flow_engine = OrderFlowEngine(market_state, window_size, Logger(OrderFlowEngine, logger_settings_console))
     order_book_engine = OrderBookEngine(market_state, config_manager)
 
@@ -126,7 +128,7 @@ async def main():
     notifier = ToastNotifier(Logger(ToastNotifier, logger_settings_file))
 
     # 6. TRADING LOOP
-    heartbeat = Heartbeat(5)
+    heartbeat = Heartbeat(heartbeat_seconds)
 
     trading_loop = TradingLoop(
         market_state,
