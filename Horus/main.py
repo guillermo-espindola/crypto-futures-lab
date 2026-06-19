@@ -67,7 +67,7 @@ async def main():
     liquidation_state = LiquidationState(max_liquidations)
     trades_state = TradeState(max_trades)
 
-    aggregate_trade_candle_builder = CandleAggregator(10, candles_state, Logger(CandleAggregator, logger_settings_console))
+    aggregate_trade_candle_builder = CandleAggregator(symbol, 10, candles_state, Logger(CandleAggregator, logger_settings_console))
 
     market_state = MarketState(candles_state,
                                order_book_state,

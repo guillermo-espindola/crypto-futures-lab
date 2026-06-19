@@ -1,5 +1,5 @@
 from collections import deque
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from models.candle_event import CandleEvent
 from models.candle import Candle
@@ -34,3 +34,9 @@ class CandlesState:
 
     def get_timeframe_candles(self, timeframe:str) -> List[Candle]:
         return list(self._timeframe_candles.get(timeframe, []))
+    
+    def get_last(self, timeframe: str) -> Optional[Candle]:
+        candles = self._timeframe_candles.get(timeframe)
+        if not candles:
+            return None
+        return candles[-1]
