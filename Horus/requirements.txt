@@ -5,9 +5,4 @@ aiokafka
 asyncio
 requests
 scipy
-pandas
 winotify
-# Optional / Performance
-numba
-polars
-pyarrow
