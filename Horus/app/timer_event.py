@@ -2,7 +2,7 @@ from typing import Callable, List
 
 from models.candle import Candle
 
-class HeartbeatEvent:
+class TimerEvent:
     def __init__(self):
         self._handlers: List[Callable[[int], None]] = []
     

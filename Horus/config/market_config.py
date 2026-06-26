@@ -7,7 +7,7 @@ class MarketConfig:
     timeframe: str
     timeframes: List[str]
     timeframe_seconds: int
-    heartbeat_seconds: int
+    timer_seconds: int
     max_candles: int
     max_agg_trades: int
     max_liquidations: int

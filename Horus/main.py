@@ -1,7 +1,6 @@
 import asyncio
 
-from app.heartbeat import Heartbeat
-from app.trading_loop import TradingLoop
+from app.timer import Timer
 from app.trading_service import TradingService
 
 from config.config_manager import ConfigManager
@@ -19,7 +18,6 @@ from engines.structure_engine import StructureEngine
 from infrastructure.aggregate_trades_data_loader import AggregateTradesDataLoader
 from infrastructure.candles_data_loader import CandlesDataLoader
 from infrastructure.event_dispatcher import EventDispatcher
-from infrastructure.kafka_consumer import KafkaConsumer
 from infrastructure.orderbook_data_loader import OrderBookDataLoader
 from infrastructure.rabbitmq_consumer import RabbitMQConsumer
 
@@ -47,7 +45,7 @@ async def main():
     timeframe = app_config.market.timeframe
     timeframes = app_config.market.timeframes
     timeframe_seconds = app_config.market.timeframe_seconds
-    heartbeat_seconds = app_config.market.heartbeat_seconds
+    timer_seconds = app_config.market.timer_seconds
     max_candles = app_config.market.max_candles
     max_orderbook_depth = app_config.market.max_orderbook_depth
     max_agg_trades = app_config.market.max_agg_trades
@@ -127,7 +125,7 @@ async def main():
     notifier = ToastNotifier(Logger(ToastNotifier, logger_settings_file))
 
     # 6. TRADING LOOP
-    heartbeat = Heartbeat(heartbeat_seconds)
+    timer = Timer(timer_seconds)
 
     trading_service = TradingService(
         market_state,
@@ -142,7 +140,7 @@ async def main():
         execution_engine,
         notifier,
         config_manager,
-        Logger(TradingLoop, logger_settings_console)
+        Logger(TradingService, logger_settings_console)
     )
 
     try:
@@ -154,9 +152,9 @@ async def main():
 
         candles_state.new_candle_event.subscribe(trading_service.on_new_candle)
         portfolio_engine.open_position_event.subscribe(trading_service.on_open_position)
-        heartbeat.beat_event.subscribe(market_state.refresh)
+        timer.tick_event.subscribe(market_state.refresh)
         
-        heartbeat.start()
+        timer.start()
         
         rabbitmq_consumer.start()
     except KeyboardInterrupt:
@@ -164,7 +162,7 @@ async def main():
     except Exception as e:
         print(f"[ERROR][Main] {e}")
     finally:
-        heartbeat.stop()
+        timer.stop()
 
 if __name__ == "__main__":
     try:

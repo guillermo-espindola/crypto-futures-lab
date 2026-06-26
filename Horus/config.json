@@ -1,10 +1,10 @@
 {
   "market": {
     "symbol": "REUSDT",
-    "timeframe": "1s",
+    "timeframe": "5s",
     "timeframes": [],
-    "timeframe_seconds": 1,    
-    "heartbeat_seconds": 1,
+    "timeframe_seconds": 5,    
+    "timer_seconds": 5,
     "max_candles": 500,
     "max_agg_trades": 1000,
     "max_liquidations": 100,
