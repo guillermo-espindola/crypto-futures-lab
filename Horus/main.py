@@ -151,6 +151,7 @@ async def main():
         aggregate_trades_data_loader.load()
 
         candles_state.new_candle_event.subscribe(trading_service.on_new_candle)
+        market_state.new_price_event.subscribe(trading_service.on_update_market_price)
         portfolio_engine.open_position_event.subscribe(trading_service.on_open_position)
         timer.tick_event.subscribe(market_state.refresh)
         

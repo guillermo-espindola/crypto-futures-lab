@@ -103,62 +103,40 @@ class TradingService:
         self._last_trade_timestamp = datetime.now().timestamp()
         self._notifier.notify(f"[OPEN {position.position_type.value}] Q={position.quantity:.4f} P={position.entry_price:.6f} " 
                           f"TP={position.take_profit:.6f} SL={position.stop_loss:.6f}")
+        
+    def on_update_market_price(self, price: float):
 
-    def on_new_candle(self, candle: Candle):
-        self.run()
+        self._order_flow_engine.update_metrics()
 
-    def run(self):
-        try:
-            
-            # 1. UPDATE MARKET DATA
-            # await self._kafka_consumer.poll_events()
-            current_market_price = self._market_state.get_current_price()
+        regime_score = self._regime_engine.regime_score()
+        market_efficiency = self._regime_engine.market_efficiency()
 
-            # 2. HIERARCHICAL PIPELINE
+        # POSITION MANAGEMENT
+        if price > 0:
+            if self._portfolio_engine.has_open_position():
+                current_position = self._portfolio_engine.get_current_position()
+                close_reason = None
+                if current_position.position_type == PositionType.LONG and price <= current_position.stop_loss:
+                    close_reason = "STOP LOSS"
+                elif current_position.position_type == PositionType.SHORT and price >= current_position.stop_loss:
+                    close_reason = "STOP LOSS"
+                elif current_position.position_type == PositionType.LONG and price >= current_position.take_profit:
+                    close_reason = "TAKE PROFIT"
+                elif current_position.position_type == PositionType.SHORT and price <= current_position.take_profit:
+                    close_reason = "TAKE PROFIT"
+                elif current_position.position_type == PositionType.LONG and self._short_confirmations >= 1 and self._short_score_ema > 0.5: # 3 0.7
+                    close_reason = "REVERSE SIGNAL"
+                elif current_position.position_type == PositionType.SHORT and self._long_confirmations >= 1 and self._long_score_ema > 0.5: # 3 0.7
+                    close_reason = "REVERSE SIGNAL"
 
-            # A. Order Flow Update (Tick-based)
-            self._order_flow_engine.update_metrics()
-
-            # B. Scoring Fusion (Fuses tick-flow with cached candle snapshots)
-            long_score, short_score = self._scoring_engine.compute_scores()
-
-            resistance, support = self._structure_engine.get_key_levels()
-            self._last_resistance = resistance if resistance is not None else self._last_resistance
-            self._last_support = support if support is not None else self._last_support
-
-            regime_score = self._regime_engine.regime_score()
-            market_efficiency = self._regime_engine.market_efficiency()
-
-            # C. Smoothing & Confirmations
-            self._update_ema(long_score, short_score)
-            self._update_confirmations()
-
-            # 3. POSITION MANAGEMENT
-            if current_market_price > 0:
-                if self._portfolio_engine.has_open_position():
-                    current_position = self._portfolio_engine.get_current_position()
-                    close_reason = None
-                    if current_position.position_type == PositionType.LONG and current_market_price <= current_position.stop_loss:
-                        close_reason = "STOP LOSS"
-                    elif current_position.position_type == PositionType.SHORT and current_market_price >= current_position.stop_loss:
-                        close_reason = "STOP LOSS"
-                    elif current_position.position_type == PositionType.LONG and current_market_price >= current_position.take_profit:
-                        close_reason = "TAKE PROFIT"
-                    elif current_position.position_type == PositionType.SHORT and current_market_price <= current_position.take_profit:
-                        close_reason = "TAKE PROFIT"
-                    elif current_position.position_type == PositionType.LONG and self._short_confirmations >= 1 and self._short_score_ema > 0.5: # 3 0.7
-                        close_reason = "REVERSE SIGNAL"
-                    elif current_position.position_type == PositionType.SHORT and self._long_confirmations >= 1 and self._long_score_ema > 0.5: # 3 0.7
-                        close_reason = "REVERSE SIGNAL"
-
-                    if close_reason:
-                        pnl = self._execution_engine.close_position(current_market_price)
-                        if pnl is not None:
-                            msg = f"CLOSED {current_position.position_type} Q={current_position.quantity:.4f} P={current_market_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
-                            self._logger.info(msg)
-                            self._notifier.notify(msg)
-
-            # 4. ENTRY SIGNAL
+                if close_reason:
+                    pnl = self._execution_engine.close_position(price)
+                    if pnl is not None:
+                        msg = f"CLOSED {current_position.position_type} Q={current_position.quantity:.4f} P={price:.6f} REASON={close_reason} PnL={pnl:.2f}"
+                        self._logger.info(msg)
+                        self._notifier.notify(msg)
+        
+            # ENTRY SIGNAL
             position_type = self._generate_position_type()
 
             if (position_type != PositionType.NONE) and not self._portfolio_engine.has_open_position():
@@ -166,13 +144,13 @@ class TradingService:
                 take_profit_percentage = 0.02 # Simplified, should be in config
                 stop_lose_percentage = 0.01
 
-                stop_loss = current_market_price * (1 - stop_lose_percentage) if position_type == PositionType.LONG else current_market_price * (1 + stop_lose_percentage)
-                take_profit = current_market_price * (1 + take_profit_percentage) if position_type == PositionType.LONG else current_market_price * (1 - take_profit_percentage)
+                stop_loss = price * (1 - stop_lose_percentage) if position_type == PositionType.LONG else price * (1 + stop_lose_percentage)
+                take_profit = price * (1 + take_profit_percentage) if position_type == PositionType.LONG else price * (1 - take_profit_percentage)
 
                 # Dynamic Sizing based on Regime
                 position_size = self._risk_engine.calculate_position_size(
                     balance=self._portfolio_engine._balance,
-                    entry_price=current_market_price,
+                    entry_price=price,
                     stop_loss_price=stop_loss,
                     regime_score=regime_score,
                     efficiency_score=market_efficiency
@@ -181,7 +159,7 @@ class TradingService:
                 if position_size > 0:
                     result = self._execution_engine.execute_market_order(
                         position_type=position_type,
-                        market_price=current_market_price,
+                        market_price=price,
                         quantity=position_size,
                         leverage=self._config_manager.get_config().risk.max_leverage,
                         stop_loss=stop_loss,
@@ -195,13 +173,23 @@ class TradingService:
                         rel_slip = abs(result.slippage / result.execution_price) if result.execution_price > 0 else 0
                         self._regime_engine.apply_execution_feedback(rel_slip)
 
-            # 5. SNAPSHOT LOG
-            portfolio_snapshot = self._portfolio_engine.get_portfolio_snapshot(current_market_price)
-            self._logger.info(f"[MARKET] Price={current_market_price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
-            self._logger.info(f"[LEVELS] Resistance={self._last_resistance}, Support={self._last_support}")
-            self._logger.info(f"[SCORES] Long={long_score:.2f} Short={short_score:.2f}, EMA_L={self._long_score_ema:.2f}, EMA_S={self._short_score_ema:.2f}")
-            self._logger.info(f"[PORTFOLIO] Equity={portfolio_snapshot.equity:.2f}, Balance={portfolio_snapshot.balance:.2f}")
+        portfolio_snapshot = self._portfolio_engine.get_portfolio_snapshot(price)
+        self._logger.info(f"[on_update_market_price][MARKET] Price={price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
+        self._logger.info(f"[on_update_market_price][PORTFOLIO] Equity={portfolio_snapshot.equity:.2f}, Balance={portfolio_snapshot.balance:.2f}")
+
+    def on_new_candle(self, candle: Candle):
+        try:
+            long_score, short_score = self._scoring_engine.compute_scores()
+            resistance, support = self._structure_engine.get_key_levels()
+            self._last_resistance = resistance if resistance is not None else self._last_resistance
+            self._last_support = support if support is not None else self._last_support           
+
+            self._update_ema(long_score, short_score)
+            self._update_confirmations()
+
+            self._logger.info(f"[on_new_candle][LEVELS] Resistance={self._last_resistance}, Support={self._last_support}")
+            self._logger.info(f"[on_new_candle][SCORES] Long={long_score:.2f} Short={short_score:.2f}, EMA_L={self._long_score_ema:.2f}, EMA_S={self._short_score_ema:.2f}")
 
         except Exception as e:
-            self._logger.error(f"Loop Error: {e}")
-            self._notifier.notify(f"ERROR: {e}")
+            self._logger.error(f"[on_new_candle][ERROR] {e}")
+            self._notifier.notify(f"[on_new_candle][ERROR] {e}")

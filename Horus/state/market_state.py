@@ -8,6 +8,7 @@ from models.candle_snapshot import CandleSnapshot
 from models.liquidation import Liquidation
 from models.orderbook_depth_update import OrderBookDepthUpdate
 from models.orderbook import OrderBook
+from models.price_event import PriceEvent
 from models.trade import Trade
 
 from state.aggregate_trade_state import AggregateTradeState
@@ -40,12 +41,15 @@ class MarketState:
         self._last_candle_open_time: Dict[str, int] = {}
         self._snapshot_cache: Dict[str, CandleSnapshot] = {}
 
+        self.new_price_event = PriceEvent()
+
     def refresh(self, timestamp: int):
         self._candle_aggregator.refresh(timestamp, self._current_price)
     
     # CURRENT PRICE
-    def set_current_price(self, current_price: float):
-        self._current_price = current_price
+    def set_current_price(self, price: float):
+        self._current_price = price
+        self.new_price_event.trigger(price)
     
     def get_current_price(self) -> float:
         return self._current_price
