@@ -20,7 +20,7 @@ class ExecutionEngine:
         self._execution_history: List[TradeExecution] = []
         self._trades_count = 0
 
-    async def execute_market_order(
+    def execute_market_order(
         self,
         position_type: PositionType,
         market_price: float,
@@ -70,5 +70,5 @@ class ExecutionEngine:
 
         return trade_execution
 
-    async def close_position(self, current_price: float) -> Optional[float]:
+    def close_position(self, current_price: float) -> Optional[float]:
         return self.portfolio.close_position(current_price)

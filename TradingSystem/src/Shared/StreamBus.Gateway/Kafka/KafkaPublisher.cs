@@ -2,7 +2,7 @@
 {
     using StreamBus.Gateway.Abstractions;
     using Confluent.Kafka;
-    public class KafkaPublisher : IMessagePublisher
+    public class KafkaPublisher : IMessageProducer
     {
         private IProducer<Null, string>? _producer;
 
@@ -23,7 +23,7 @@
             GC.SuppressFinalize(this);
         }
 
-        public async Task PublishAsync<TMessage>(string topic, TMessage message, CancellationToken cancellationToken)
+        public async Task ProduceAsync<TMessage>(string topic, TMessage message, CancellationToken cancellationToken)
         {
             await _producer!.ProduceAsync(topic,
                 new Message<Null, string>

@@ -1,0 +1,207 @@
+from datetime import datetime
+from typing import Optional
+
+from models.candle import Candle
+from models.position import Position
+from models.position_type import PositionType
+from notification.notifier_interface import INotifier
+
+from state.market_state import MarketState
+
+from engines.structure_engine import StructureEngine
+from engines.liquidity_engine import LiquidityEngine
+from engines.order_flow_engine import OrderFlowEngine
+from engines.regime_engine import RegimeEngine
+from engines.order_book_engine import OrderBookEngine
+from engines.scoring_engine import ScoringEngine
+from engines.portfolio_engine import PortfolioEngine
+from engines.risk_engine import RiskEngine
+from engines.execution_engine import ExecutionEngine
+from config.config_manager import ConfigManager
+from utils.logger_interface import ILogger
+
+class TradingService:
+    def __init__(self,
+                 market_state: MarketState,
+                 structure_engine: StructureEngine,
+                 liquidity_engine: LiquidityEngine,
+                 order_flow_engine: OrderFlowEngine,
+                 regime_engine: RegimeEngine,
+                 order_book_engine: OrderBookEngine,
+                 scoring_engine: ScoringEngine,
+                 portfolio_engine: PortfolioEngine,
+                 risk_engine: RiskEngine,
+                 execution_engine: ExecutionEngine,
+                 notifier: INotifier,
+                 config_manager: ConfigManager,
+                 logger: ILogger):
+
+        self._market_state = market_state
+        self._structure_engine = structure_engine
+        self._liquidity_engine = liquidity_engine
+        self._order_flow_engine = order_flow_engine
+        self._regime_engine = regime_engine
+        self._order_book_engine = order_book_engine
+        self._scoring_engine = scoring_engine
+        self._portfolio_engine = portfolio_engine
+        self._risk_engine = risk_engine
+        self._execution_engine = execution_engine
+        self._notifier = notifier
+        self._logger = logger
+        self._config_manager = config_manager
+
+        # Signal Smoothing (EMA)
+        self._last_resistance: Optional[float] = None
+        self._last_support: Optional[float] = None
+        self._long_score_ema = 0.0
+        self._short_score_ema = 0.0
+
+        # Confirmations
+        self._long_confirmations = 0
+        self._short_confirmations = 0
+
+        # Cooldown
+        self._last_trade_timestamp = 0.0
+
+    def _update_ema(self, long_score: float, short_score: float):
+        a = self._config_manager.get_config().scoring.ema_alpha
+        self._long_score_ema = a * long_score + (1 - a) * self._long_score_ema
+        self._short_score_ema = a * short_score + (1 - a) * self._short_score_ema
+
+    def _update_confirmations(self):
+        threshold = self._config_manager.get_config().scoring.confirmation_threshold
+
+        if self._long_score_ema > 0.5: # Calibrated midpoint
+            self._long_confirmations += 1
+        else:
+            self._long_confirmations = 0
+
+        if self._short_score_ema > 0.5:
+            self._short_confirmations += 1
+        else:
+            self._short_confirmations = 0
+
+    def _cooldown_active(self) -> bool:
+        now = datetime.now().timestamp()
+        cooldown = self._config_manager.get_config().behavior.cooldown_seconds
+        return (now - self._last_trade_timestamp) < cooldown
+
+    def _generate_position_type(self) -> PositionType:
+        if self._cooldown_active():
+            return PositionType.NONE
+
+        threshold = self._config_manager.get_config().scoring.confirmation_threshold
+        if self._long_confirmations >= threshold and self._long_score_ema > self._short_score_ema:
+            return PositionType.LONG
+
+        if self._short_confirmations >= threshold and self._short_score_ema > self._long_score_ema:
+            return PositionType.SHORT
+
+        return PositionType.NONE
+    
+    def on_open_position(self, position: Position):
+        self._last_trade_timestamp = datetime.now().timestamp()
+        self._notifier.notify(f"[OPEN {position.position_type.value}] Q={position.quantity:.4f} P={position.entry_price:.6f} " 
+                          f"TP={position.take_profit:.6f} SL={position.stop_loss:.6f}")
+
+    def on_new_candle(self, candle: Candle):
+        self.run()
+
+    def run(self):
+        try:
+            
+            # 1. UPDATE MARKET DATA
+            # await self._kafka_consumer.poll_events()
+            current_market_price = self._market_state.get_current_price()
+
+            # 2. HIERARCHICAL PIPELINE
+
+            # A. Order Flow Update (Tick-based)
+            self._order_flow_engine.update_metrics()
+
+            # B. Scoring Fusion (Fuses tick-flow with cached candle snapshots)
+            long_score, short_score = self._scoring_engine.compute_scores()
+
+            resistance, support = self._structure_engine.get_key_levels()
+            self._last_resistance = resistance if resistance is not None else self._last_resistance
+            self._last_support = support if support is not None else self._last_support
+
+            regime_score = self._regime_engine.regime_score()
+            market_efficiency = self._regime_engine.market_efficiency()
+
+            # C. Smoothing & Confirmations
+            self._update_ema(long_score, short_score)
+            self._update_confirmations()
+
+            # 3. POSITION MANAGEMENT
+            if current_market_price > 0:
+                if self._portfolio_engine.has_open_position():
+                    current_position = self._portfolio_engine.get_current_position()
+                    close_reason = None
+                    if current_position.position_type == PositionType.LONG and current_market_price <= current_position.stop_loss:
+                        close_reason = "STOP LOSS"
+                    elif current_position.position_type == PositionType.SHORT and current_market_price >= current_position.stop_loss:
+                        close_reason = "STOP LOSS"
+                    elif current_position.position_type == PositionType.LONG and current_market_price >= current_position.take_profit:
+                        close_reason = "TAKE PROFIT"
+                    elif current_position.position_type == PositionType.SHORT and current_market_price <= current_position.take_profit:
+                        close_reason = "TAKE PROFIT"
+                    elif current_position.position_type == PositionType.LONG and self._short_confirmations >= 1 and self._short_score_ema > 0.5: # 3 0.7
+                        close_reason = "REVERSE SIGNAL"
+                    elif current_position.position_type == PositionType.SHORT and self._long_confirmations >= 1 and self._long_score_ema > 0.5: # 3 0.7
+                        close_reason = "REVERSE SIGNAL"
+
+                    if close_reason:
+                        pnl = self._execution_engine.close_position(current_market_price)
+                        if pnl is not None:
+                            msg = f"CLOSED {current_position.position_type} Q={current_position.quantity:.4f} P={current_market_price:.6f} REASON={close_reason} PnL={pnl:.2f}"
+                            self._logger.info(msg)
+                            self._notifier.notify(msg)
+
+            # 4. ENTRY SIGNAL
+            position_type = self._generate_position_type()
+
+            if (position_type != PositionType.NONE) and not self._portfolio_engine.has_open_position():
+                # Dynamic Stop/Profit
+                take_profit_percentage = 0.02 # Simplified, should be in config
+                stop_lose_percentage = 0.01
+
+                stop_loss = current_market_price * (1 - stop_lose_percentage) if position_type == PositionType.LONG else current_market_price * (1 + stop_lose_percentage)
+                take_profit = current_market_price * (1 + take_profit_percentage) if position_type == PositionType.LONG else current_market_price * (1 - take_profit_percentage)
+
+                # Dynamic Sizing based on Regime
+                position_size = self._risk_engine.calculate_position_size(
+                    balance=self._portfolio_engine._balance,
+                    entry_price=current_market_price,
+                    stop_loss_price=stop_loss,
+                    regime_score=regime_score,
+                    efficiency_score=market_efficiency
+                )
+
+                if position_size > 0:
+                    result = self._execution_engine.execute_market_order(
+                        position_type=position_type,
+                        market_price=current_market_price,
+                        quantity=position_size,
+                        leverage=self._config_manager.get_config().risk.max_leverage,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit
+                    )
+
+                    if result and result.success:
+                        self._last_trade_timestamp = datetime.now().timestamp()
+
+                        # FEEDBACK LOOP: Send relative slippage back to RegimeEngine
+                        rel_slip = abs(result.slippage / result.execution_price) if result.execution_price > 0 else 0
+                        self._regime_engine.apply_execution_feedback(rel_slip)
+
+            # 5. SNAPSHOT LOG
+            portfolio_snapshot = self._portfolio_engine.get_portfolio_snapshot(current_market_price)
+            self._logger.info(f"[MARKET] Price={current_market_price:.6f}, Regime={regime_score:.2f}, Eff={market_efficiency:.2f}")
+            self._logger.info(f"[LEVELS] Resistance={self._last_resistance}, Support={self._last_support}")
+            self._logger.info(f"[SCORES] Long={long_score:.2f} Short={short_score:.2f}, EMA_L={self._long_score_ema:.2f}, EMA_S={self._short_score_ema:.2f}")
+            self._logger.info(f"[PORTFOLIO] Equity={portfolio_snapshot.equity:.2f}, Balance={portfolio_snapshot.balance:.2f}")
+
+        except Exception as e:
+            self._logger.error(f"Loop Error: {e}")
+            self._notifier.notify(f"ERROR: {e}")

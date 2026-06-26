@@ -9,18 +9,18 @@ namespace MarketDataService.Ingestion
         private readonly ILogger<Worker> _logger;        
         private readonly IngestionSettings _ingestionSettings;
         private readonly List<IDataStreamer> _dataStreamers;
-        private readonly IMessagePublisher _messagePublisher;
+        private readonly IMessageProducer _messageProducer;
         private readonly IServiceProvider _serviceProvider;
 
         public Worker(ILogger<Worker> logger,
              IOptions<IngestionSettings> ingestionSettings,
-             IMessagePublisher messagePublisher,
+             IMessageProducer messagePublisher,
              IServiceProvider serviceProvider)
         {
             _logger = logger;
             _ingestionSettings = ingestionSettings.Value;
             _dataStreamers = new List<IDataStreamer>();
-            _messagePublisher = messagePublisher;
+            _messageProducer = messagePublisher;
             _serviceProvider = serviceProvider;
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,7 +28,7 @@ namespace MarketDataService.Ingestion
             _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
             
             var taskList = new List<Task>();
-            await _messagePublisher.ConnectAsync(_ingestionSettings?.Destination?.Connection!);
+            await _messageProducer.ConnectAsync(_ingestionSettings?.Destination?.Connection!);
             foreach (var streamSettings in _ingestionSettings?.Streams!)
             {
                 var webSocketClient = _serviceProvider.GetRequiredService<IDataStreamer>();
@@ -59,12 +59,12 @@ namespace MarketDataService.Ingestion
                 
                 //_logger.LogDebug($"**{name}** {result}");
 
-                await _messagePublisher.PublishAsync(name, result, cancellationToken);
+                await _messageProducer.ProduceAsync(name, result, cancellationToken);
             }
         }
         public override void Dispose()
         {
-            _messagePublisher.Dispose();
+            _messageProducer.Dispose();
             foreach (var dataStreamer in _dataStreamers)
             {
                 dataStreamer.Dispose();

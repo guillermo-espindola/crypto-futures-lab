@@ -1,4 +1,3 @@
-# Core dependencies
 numpy
 pandas
 aiokafka
@@ -6,3 +5,4 @@ asyncio
 requests
 scipy
 winotify
+pika

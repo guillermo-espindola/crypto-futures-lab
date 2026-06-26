@@ -3,7 +3,7 @@ import json
 from config.behavior_config import BehaviorConfig
 from config.execution_config import ExecutionConfig
 from config.history_config import HistoryConfig
-from config.kafka_config import KafkaConfig
+from config.consumer_config import ConsumerConfig
 from config.liquidity_config import LiquidityConfig
 from config.logger_config import LoggerConfig
 from config.market_config import MarketConfig
@@ -41,7 +41,7 @@ class ConfigManager:
                 order_flow=OrderFlowConfig(**config["order_flow"]),
                 execution=ExecutionConfig(**config["execution"]),
                 behavior=BehaviorConfig(**config["behavior"]),
-                kafka=KafkaConfig(**config["kafka"]),
+                consumer=ConsumerConfig(**config["consumer"]),
                 telegram=TelegramConfig(**config["telegram"]),
                 logger=LoggerConfig(**config["logger"])
                 )

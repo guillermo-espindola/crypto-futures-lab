@@ -4,6 +4,12 @@
   <Folder Name="/deploy/docker/kafka/">
     <File Path="deploy/docker/kafka/docker-compose.yml" />
   </Folder>
+  <Folder Name="/deploy/docker/rabbitmq/">
+    <File Path="deploy/docker/rabbitmq/docker-compose.yml" />
+  </Folder>
+  <Folder Name="/deploy/docker/redis/">
+    <File Path="deploy/docker/redis/docker-compose.yml" />
+  </Folder>
   <Folder Name="/docs/">
     <File Path="docs/README.md" />
   </Folder>

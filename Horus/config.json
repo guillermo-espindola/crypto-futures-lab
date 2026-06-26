@@ -1,10 +1,10 @@
 {
   "market": {
-    "symbol": "VELVETUSDT",
-    "timeframe": "5s",
+    "symbol": "REUSDT",
+    "timeframe": "1s",
     "timeframes": [],
-    "timeframe_seconds": 5,    
-    "heartbeat_seconds": 5,
+    "timeframe_seconds": 1,    
+    "heartbeat_seconds": 1,
     "max_candles": 500,
     "max_agg_trades": 1000,
     "max_liquidations": 100,
@@ -66,10 +66,11 @@
     "cooldown_seconds": 3,
     "noise_tolerance": "high"
   },
-  "kafka": {
-    "bootstrap_server": "localhost:29092",
-    "topics": [ "Candles", "Trades", "Orderbook", "Liquidations", "AggregateTrades"],
-    "group_id": "horus-engine"
+  "consumer": {
+    "id": "horus",
+    "type": "RabbitMQ",
+    "connection_string": "amqp://admin:admin123@localhost:5672/",
+    "sources": [ "Candles", "Trades", "Orderbook", "Liquidations", "AggregateTrades"]
   },
   "logger": {
     "enable_file_logging": true,

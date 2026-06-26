@@ -2,6 +2,7 @@ import asyncio
 
 from app.heartbeat import Heartbeat
 from app.trading_loop import TradingLoop
+from app.trading_service import TradingService
 
 from config.config_manager import ConfigManager
 
@@ -20,6 +21,7 @@ from infrastructure.candles_data_loader import CandlesDataLoader
 from infrastructure.event_dispatcher import EventDispatcher
 from infrastructure.kafka_consumer import KafkaConsumer
 from infrastructure.orderbook_data_loader import OrderBookDataLoader
+from infrastructure.rabbitmq_consumer import RabbitMQConsumer
 
 from notification.toast_notifier import ToastNotifier
 
@@ -58,12 +60,12 @@ async def main():
     history_orderbook_endpoint = app_config.history.orderbook_depth_endpoint
     history_aggregate_trades_endpoint = app_config.history.aggregate_trades_endpoint
 
-    kafka_topics = app_config.kafka.topics
-    kafka_bootstrap_server = app_config.kafka.bootstrap_server
-    kafka_group_id = app_config.kafka.group_id
+    consumer_id = app_config.consumer.id
+    consumer_connection_string = app_config.consumer.connection_string
+    consumer_sources = app_config.consumer.sources
 
     candles_state = CandlesState(max_candles,
-                                 Logger(CandlesState, logger_settings_file))
+                                 Logger(CandlesState, logger_settings_console))
     order_book_state = OrderBookState(Logger(OrderBookState, logger_settings_console))
     aggregate_trade_state = AggregateTradeState(max_agg_trades)
     liquidation_state = LiquidationState(max_liquidations)
@@ -91,11 +93,8 @@ async def main():
     orderbook_data_loader = OrderBookDataLoader(history_orderbook_endpoint, symbol, max_orderbook_depth, order_book_state, Logger(OrderBookDataLoader, logger_settings_console))
     event_dispatcher = EventDispatcher(market_state,
                                        Logger(EventDispatcher, logger_settings_console))
-    kafka_consumer = KafkaConsumer( kafka_topics, 
-                                   kafka_bootstrap_server,
-                                   kafka_group_id,
-                                   event_dispatcher,
-                                   Logger(KafkaConsumer, logger_settings_console))
+        
+    rabbitmq_consumer = RabbitMQConsumer(consumer_id, consumer_connection_string, consumer_sources, event_dispatcher, Logger(RabbitMQConsumer, logger_settings_console))
 
     # 4. ENGINES (Hierarchical dependency)
     regime_engine = RegimeEngine(market_state, timeframe, config_manager, Logger(RegimeEngine, logger_settings_console))
@@ -130,9 +129,8 @@ async def main():
     # 6. TRADING LOOP
     heartbeat = Heartbeat(heartbeat_seconds)
 
-    trading_loop = TradingLoop(
+    trading_service = TradingService(
         market_state,
-        kafka_consumer,
         structure_engine,
         liquidity_engine,
         order_flow_engine,
@@ -149,16 +147,18 @@ async def main():
 
     try:
         notifier.notify("[HORUS]")
+        
         candles_data_loader.load()
         orderbook_data_loader.load()
         aggregate_trades_data_loader.load()
-        candles_state.new_candle_event.subscribe(trading_loop.on_new_candle)
-        portfolio_engine.open_position_event.subscribe(trading_loop.on_open_position)
+
+        candles_state.new_candle_event.subscribe(trading_service.on_new_candle)
+        portfolio_engine.open_position_event.subscribe(trading_service.on_open_position)
         heartbeat.beat_event.subscribe(market_state.refresh)
         
-        await kafka_consumer.start()
         heartbeat.start()
-        await trading_loop.run(sleep_time=0.5)
+        
+        rabbitmq_consumer.start()
     except KeyboardInterrupt:
         print(f"[EXIT][Main] Stopping Horus")
     except Exception as e:
