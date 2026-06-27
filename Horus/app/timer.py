@@ -14,10 +14,10 @@ class Timer:
 
     def start(self):
         self._is_running = True
-        self._thread = Thread(target=self._run_beat_loop, daemon=True)
+        self._thread = Thread(target=self._run, daemon=True)
         self._thread.start()
 
-    def _run_beat_loop(self):
+    def _run(self):
         while self._is_running:
             time.sleep(self._interval_seconds)
             if self._is_running:
